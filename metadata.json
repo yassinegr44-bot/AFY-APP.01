@@ -1,0 +1,8 @@
+{
+  "name": "AFY",
+  "description": "Professional deceased record management and morgue operation system with real-time tracking, fridge synchronization, and institutional reporting.",
+  "requestFramePermissions": [],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}

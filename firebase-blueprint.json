@@ -1,0 +1,50 @@
+{
+  "collections": {
+    "deceased": {
+      "description": "Records of deceased persons managed by the facility.",
+      "fields": {
+        "refNumber": "string",
+        "name": "string",
+        "gender": "string",
+        "dob": "timestamp",
+        "dateOfDeath": "timestamp",
+        "timeOfDeath": "string",
+        "cause": "string",
+        "origin": "string",
+        "admissionDate": "timestamp",
+        "admissionTime": "string",
+        "fridgePosition": "number",
+        "status": "string",
+        "exitDate": "timestamp",
+        "exitTime": "string",
+        "exitNotes": "string",
+        "notes": "string",
+        "createdBy": "string",
+        "createdAt": "timestamp",
+        "updatedAt": "timestamp"
+      }
+    },
+    "fridge": {
+      "description": "Status of the 12 fridge positions.",
+      "fields": {
+        "position": "number",
+        "status": "string",
+        "deceasedId": "string"
+      }
+    },
+    "users": {
+      "description": "App users and their roles.",
+      "fields": {
+        "email": "string",
+        "role": "string",
+        "name": "string"
+      }
+    },
+    "settings": {
+      "description": "Application wide configurations.",
+      "fields": {
+        "alertThresholdDays": "number"
+      }
+    }
+  }
+}
