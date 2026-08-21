@@ -1,12 +1,12 @@
 {
-  "projectId": "autonomous-builder-cn96h",
-  "appId": "1:602638417940:web:8080c3415d77643fb1e701",
-  "apiKey": "AIzaSyBrSqds95mRyb0cDgNaNAqJf2ilTDGM9L8",
-  "authDomain": "autonomous-builder-cn96h.firebaseapp.com",
+  "projectId": "afy-project-5a04b",
+  "appId": "1:363633597423:web:cd909434e3ddd7c049f41a",
+  "apiKey": "AIzaSyAc4UAD8SB7m7ETO8i2kMn-wHYmmk92AmE",
+  "authDomain": "afy-project-5a04b.firebaseapp.com",
   "firestoreDatabaseId": "ai-studio-afy-6380f5ad-2b1a-4f07-8968-91752227ecc2",
-  "storageBucket": "autonomous-builder-cn96h.firebasestorage.app",
-  "messagingSenderId": "602638417940",
+  "storageBucket": "afy-project-5a04b.firebasestorage.app",
+  "messagingSenderId": "363633597423",
   "measurementId": "",
-  "oAuthClientId": "602638417940-tqd74ql2aj3hg790rfqlfvefgcjed05c.apps.googleusercontent.com",
+  "oAuthClientId": "363633597423-eablrbkq0udv4gh7l0pqv5odolkdhc8v.apps.googleusercontent.com",
   "recaptchaSiteKey": ""
 }

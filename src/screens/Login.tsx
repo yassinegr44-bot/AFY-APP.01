@@ -1,13 +1,16 @@
 import React, { useState } from 'react';
-import { signInWithPopup, GoogleAuthProvider } from 'firebase/auth';
+import { signInWithPopup, GoogleAuthProvider, signInWithEmailAndPassword, createUserWithEmailAndPassword } from 'firebase/auth';
 import { doc, setDoc, getDoc } from 'firebase/firestore';
 import { auth, db } from '../lib/firebase';
 import { motion } from 'motion/react';
-import { LogIn, Plus } from 'lucide-react';
+import { LogIn, Plus, Mail, Lock } from 'lucide-react';
 
 export function Login() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [isRegistering, setIsRegistering] = useState(false);
 
   const handleGoogleSignIn = async () => {
     setLoading(true);
@@ -24,16 +27,37 @@ export function Login() {
         await setDoc(userRef, {
           name: user.displayName || 'Utilisateur',
           email: user.email,
-          role: 'admin',
+          role: 'agent',
           createdAt: new Date()
         });
       }
     } catch (err: any) {
       console.error(err);
-      if (err.code === 'auth/popup-closed-by-user') {
+      setError('Erreur lors de la connexion Google.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleEmailAuth = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setLoading(true);
+    setError('');
+    try {
+      if (isRegistering) {
+        const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+        await setDoc(doc(db, 'users', userCredential.user.uid), {
+          name: email.split('@')[0],
+          email: email,
+          role: 'agent',
+          createdAt: new Date()
+        });
       } else {
-        setError('Erreur lors de la connexion Google.');
+        await signInWithEmailAndPassword(auth, email, password);
       }
+    } catch (err: any) {
+      console.error(err);
+      setError(isRegistering ? 'Erreur lors de l\'inscription.' : 'Erreur de connexion : Vérifiez votre email et mot de passe.');
     } finally {
       setLoading(false);
     }
@@ -64,7 +88,7 @@ export function Login() {
         className="w-full max-w-sm bg-[var(--bg-card)] rounded-xl shadow-sm border border-[var(--border-color)] p-8 transition-colors"
       >
         <h2 className="text-xl font-bold text-slate-800 dark:text-slate-100 mb-8 text-center">
-          Connexion
+          {isRegistering ? 'Inscription' : 'Connexion'}
         </h2>
 
         {error && (
@@ -73,10 +97,60 @@ export function Login() {
           </p>
         )}
 
+        <form onSubmit={handleEmailAuth} className="space-y-4 mb-6">
+          <div className="relative">
+            <Mail className="absolute left-3 top-3.5 text-slate-400" size={18} />
+            <input
+              type="email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              placeholder="Email"
+              required
+              className="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg py-3 pl-10 pr-4 text-sm focus:ring-2 focus:ring-emerald-500 outline-none"
+            />
+          </div>
+          <div className="relative">
+            <Lock className="absolute left-3 top-3.5 text-slate-400" size={18} />
+            <input
+              type="password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              placeholder="Mot de passe"
+              required
+              className="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg py-3 pl-10 pr-4 text-sm focus:ring-2 focus:ring-emerald-500 outline-none"
+            />
+          </div>
+          <button
+            type="submit"
+            disabled={loading}
+            className="w-full bg-emerald-600 text-white py-3 rounded-lg font-bold hover:bg-emerald-700 disabled:opacity-50"
+          >
+            {loading ? (isRegistering ? 'Inscription...' : 'Connexion...') : (isRegistering ? 'S\'inscrire' : 'Se connecter')}
+          </button>
+        </form>
+
+        <div className="text-center text-sm mt-4">
+          <button
+            onClick={() => setIsRegistering(!isRegistering)}
+            className="text-emerald-600 dark:text-emerald-400 font-bold hover:underline"
+          >
+            {isRegistering ? 'Déjà un compte ? Se connecter' : 'Pas de compte ? S\'inscrire'}
+          </button>
+        </div>
+
+        <div className="relative my-6">
+          <div className="absolute inset-0 flex items-center">
+            <div className="w-full border-t border-slate-200 dark:border-slate-800"></div>
+          </div>
+          <div className="relative flex justify-center text-xs uppercase">
+            <span className="bg-[var(--bg-card)] px-2 text-slate-400">Ou</span>
+          </div>
+        </div>
+
         <button
           onClick={handleGoogleSignIn}
           disabled={loading}
-          className="w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-slate-700 dark:text-slate-300 py-3.5 rounded-lg font-bold flex items-center justify-center gap-3 hover:bg-slate-50 dark:hover:bg-slate-800 active:scale-[0.98] transition-all disabled:opacity-50 shadow-sm"
+          className="w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-slate-700 dark:text-slate-300 py-3 rounded-lg font-bold flex items-center justify-center gap-3 hover:bg-slate-50 dark:hover:bg-slate-800 active:scale-[0.98] transition-all disabled:opacity-50 shadow-sm text-sm"
         >
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
             <path d="M23.5 12.2c0-.8-.1-1.6-.2-2.3H12v4.4h6.5c-.3 1.5-1.1 2.7-2.3 3.5v2.9h3.7c2.2-2 3.6-5 3.6-8.5z" fill="#4285F4"/>
