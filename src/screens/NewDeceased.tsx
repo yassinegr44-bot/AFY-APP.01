@@ -29,16 +29,22 @@ export function NewDeceased({ data, onComplete }: NewDeceasedProps) {
   const [formData, setFormData] = useState({
     refNumber: 'AUTO',
     name: '',
+    cin: '',
     isUnknown: false,
-    gender: 'M',
+    gender: 'Masculin',
+    otherGender: '',
     dob: '',
     dateOfDeath: new Date().toISOString().split('T')[0],
     timeOfDeath: '12:00',
     cause: '',
-    origin: '',
+    origin: 'Marocain',
+    nationality: '',
+    originDetail: '',
     admissionDate: new Date().toISOString().split('T')[0],
     admissionTime: new Date().toTimeString().slice(0, 5),
     fridgePosition: 0,
+    missingBodyParts: [],
+    otherMissingBodyPartsDescription: '',
     notes: ''
   });
 
@@ -46,6 +52,22 @@ export function NewDeceased({ data, onComplete }: NewDeceasedProps) {
   const [success, setSuccess] = useState(false);
 
   const availablePositions = fridge.filter((p: any) => p.status === 'available');
+
+  const bodyPartOptions = [
+    "Main gauche", "Main droite", "Bras gauche", "Bras droit", 
+    "Jambe gauche", "Jambe droite", "Pied gauche", "Pied droit", 
+    "Avant-bras gauche", "Avant-bras droit", "Partie de la jambe gauche", 
+    "Partie de la jambe droite"
+  ];
+
+  const handleBodyPartChange = (part: string) => {
+    setFormData(prev => {
+      const parts = prev.missingBodyParts.includes(part)
+        ? prev.missingBodyParts.filter(p => p !== part)
+        : [...prev.missingBodyParts, part];
+      return { ...prev, missingBodyParts: parts };
+    });
+  };
 
   const handleNext = () => {
     if (!formData.isUnknown && !formData.name) {
@@ -71,8 +93,7 @@ export function NewDeceased({ data, onComplete }: NewDeceasedProps) {
         dob: formData.dob ? Timestamp.fromDate(new Date(formData.dob)) : null,
         dateOfDeath: Timestamp.fromDate(new Date(`${formData.dateOfDeath}T12:00:00`)),
         admissionDate: Timestamp.fromDate(new Date(`${formData.admissionDate}T${formData.admissionTime || '00:00'}:00`)),
-        status: 'in_facility',
-        createdBy: user?.id || 'anonymous'
+        status: 'in_facility'
       });
       setSuccess(true);
     } catch (err) {
@@ -164,12 +185,83 @@ export function NewDeceased({ data, onComplete }: NewDeceasedProps) {
                 </label>
               </div>
               <FormInput 
+                label="Numéro CIN (Optionnel)" 
+                placeholder="Ex: AB123456" 
+                value={formData.cin} 
+                onChange={(v: string) => setFormData({...formData, cin: v})} 
+                disabled={formData.isUnknown}
+                className={formData.isUnknown ? "bg-slate-50 dark:bg-slate-950 text-slate-400" : ""}
+              />
+              <FormInput 
                 label="Date de naissance" 
                 type="date" 
                 value={formData.dob} 
                 onChange={v => setFormData({...formData, dob: v})} 
                 icon={Calendar}
               />
+              <div>
+                <label className="block text-xs font-bold text-slate-400 uppercase tracking-widest mb-2">Sexe</label>
+                <select 
+                    className="w-full px-4 py-3 bg-[#f8faff] dark:bg-slate-950 rounded-lg border border-slate-100 dark:border-slate-800 focus:outline-none focus:ring-2 focus:ring-[#006050]/10 text-sm font-medium text-slate-700 dark:text-slate-300"
+                    value={formData.gender}
+                    onChange={e => setFormData({...formData, gender: e.target.value as any})}
+                >
+                    <option value="Masculin">Masculin</option>
+                    <option value="Féminin">Féminin</option>
+                    <option value="Autre">Autre</option>
+                </select>
+                {formData.gender === 'Autre' && (
+                    <input 
+                        className="w-full px-4 py-3 mt-2 bg-[#f8faff] dark:bg-slate-950 rounded-lg border border-slate-100 dark:border-slate-800 focus:outline-none focus:ring-2 focus:ring-[#006050]/10 text-sm font-medium text-slate-700 dark:text-slate-300"
+                        placeholder="Précisez..."
+                        value={formData.otherGender}
+                        onChange={e => setFormData({...formData, otherGender: e.target.value})}
+                    />
+                )}
+              </div>
+            </div>
+
+            {/* Parties corporelles */}
+            <div className="bg-white dark:bg-slate-900 rounded-xl border border-slate-100 dark:border-slate-800 p-6 space-y-4 transition-colors duration-300">
+              <h3 className="text-sm font-black text-[#006050] dark:text-emerald-400 uppercase tracking-widest border-b border-slate-50 dark:border-slate-800 pb-3 mb-4 flex items-center gap-2">
+                <Activity size={16} /> Parties corporelles absentes / amputées
+              </h3>
+              <div className="flex flex-wrap gap-2">
+                <button
+                    onClick={() => setFormData(prev => ({ ...prev, missingBodyParts: [] }))}
+                    className={cn("px-3 py-1.5 text-xs font-bold rounded-lg border transition-colors", formData.missingBodyParts.length === 0 ? "bg-emerald-100 border-emerald-200 text-emerald-800" : "bg-slate-100 border-slate-200 text-slate-600")}
+                >
+                    Aucun
+                </button>
+                {bodyPartOptions.map(part => (
+                    <button 
+                        key={part}
+                        onClick={() => handleBodyPartChange(part)}
+                        className={cn("px-3 py-1.5 text-xs font-bold rounded-lg border transition-colors", formData.missingBodyParts.includes(part) ? "bg-emerald-100 border-emerald-200 text-emerald-800" : "bg-slate-100 border-slate-200 text-slate-600")}
+                    >
+                        {part}
+                    </button>
+                ))}
+              </div>
+              <div>
+                <label className="flex items-center gap-2 mb-2 cursor-pointer">
+                    <input 
+                        type="checkbox" 
+                        checked={formData.missingBodyParts.includes('Autre')}
+                        onChange={() => handleBodyPartChange('Autre')}
+                        className="w-4 h-4 rounded border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-950 text-[#006050]"
+                    />
+                    <span className="text-xs font-black text-slate-400 uppercase tracking-widest">Autre</span>
+                </label>
+                {formData.missingBodyParts.includes('Autre') && (
+                    <input 
+                        className="w-full px-4 py-3 bg-[#f8faff] dark:bg-slate-950 rounded-lg border border-slate-100 dark:border-slate-800 focus:outline-none focus:ring-2 focus:ring-[#006050]/10 text-sm font-medium text-slate-700 dark:text-slate-300"
+                        placeholder="Précisez..."
+                        value={formData.otherMissingBodyPartsDescription}
+                        onChange={e => setFormData({...formData, otherMissingBodyPartsDescription: e.target.value})}
+                    />
+                )}
+              </div>
             </div>
 
             {/* Informations de décès */}
@@ -191,11 +283,30 @@ export function NewDeceased({ data, onComplete }: NewDeceasedProps) {
                 onChange={v => setFormData({...formData, timeOfDeath: v})} 
                 icon={Clock}
               />
+              <div>
+                <label className="block text-xs font-bold text-slate-400 uppercase tracking-widest mb-2">Origine</label>
+                <select 
+                    className="w-full px-4 py-3 bg-[#f8faff] dark:bg-slate-950 rounded-lg border border-slate-100 dark:border-slate-800 focus:outline-none focus:ring-2 focus:ring-[#006050]/10 text-sm font-medium text-slate-700 dark:text-slate-300"
+                    value={formData.origin}
+                    onChange={e => setFormData({...formData, origin: e.target.value as any})}
+                >
+                    <option value="Marocain">Marocain</option>
+                    <option value="Étranger">Étranger</option>
+                </select>
+                {formData.origin === 'Étranger' && (
+                    <input 
+                        className="w-full px-4 py-3 mt-2 bg-[#f8faff] dark:bg-slate-950 rounded-lg border border-slate-100 dark:border-slate-800 focus:outline-none focus:ring-2 focus:ring-[#006050]/10 text-sm font-medium text-slate-700 dark:text-slate-300"
+                        placeholder="Nationalité..."
+                        value={formData.nationality}
+                        onChange={e => setFormData({...formData, nationality: e.target.value})}
+                    />
+                )}
+              </div>
               <FormInput 
-                label="Origine" 
+                label="Lieu d'origine (précision)" 
                 placeholder="Ex: Hôpital Central" 
-                value={formData.origin} 
-                onChange={v => setFormData({...formData, origin: v})} 
+                value={formData.originDetail} 
+                onChange={v => setFormData({...formData, originDetail: v})} 
                 icon={MapPin}
               />
               <div>
@@ -285,10 +396,12 @@ export function NewDeceased({ data, onComplete }: NewDeceasedProps) {
               <div className="divide-y divide-slate-50 dark:divide-slate-800">
                 <ReviewRow label="Référence" value="Sera générée (AFY 2026 XXXX)" />
                 <ReviewRow label="Nom" value={formData.name || 'Identité Inconnue'} />
+                <ReviewRow label="Sexe" value={formData.gender === 'Autre' ? `Autre (${formData.otherGender})` : formData.gender} />
                 <ReviewRow label="Date Naissance" value={formData.dob || 'Non renseignée'} />
                 <ReviewRow label="Position Frigo" value={`FRIGO-${formData.fridgePosition.toString().padStart(2, '0')}`} />
                 <ReviewRow label="Admission" value={`${formData.admissionDate} à ${formData.admissionTime}`} />
-                <ReviewRow label="Origine" value={formData.origin || 'Non renseigné'} />
+                <ReviewRow label="Origine" value={`${formData.origin}${formData.origin === 'Étranger' ? ` (${formData.nationality})` : ''}`} />
+                <ReviewRow label="Détail Origine" value={formData.originDetail || 'Non renseigné'} />
               </div>
             </div>
 

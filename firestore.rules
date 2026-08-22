@@ -33,6 +33,18 @@ service cloud.firestore {
       allow delete: if isAdmin();
     }
 
+    match /historical_deceased/{recordId} {
+      allow read: if isAuthenticated();
+      allow create, update: if isStaff();
+      allow delete: if isAdmin();
+    }
+
+    match /amputees/{recordId} {
+      allow read: if isAuthenticated();
+      allow create, update: if isStaff();
+      allow delete: if isAdmin();
+    }
+
     match /fridge/{positionId} {
       allow read: if isAuthenticated();
       allow write: if isStaff();

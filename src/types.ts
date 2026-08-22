@@ -7,6 +7,7 @@ export interface AppUser {
   email: string;
   role: UserRole;
   name: string;
+  isNameConfigured?: boolean;
 }
 
 export type DeceasedStatus = 'in_facility' | 'released';
@@ -35,35 +36,80 @@ export interface Report {
   pdfUrl?: string;
 }
 
+export interface AmputeeRecord {
+  id: string;
+  refNumber: string;
+  name: string;
+  firstName: string;
+  dob?: Timestamp;
+  cin?: string;
+  bodyParts: string[];
+  cause: string;
+  otherCauseDescription?: string;
+  amputationDateTime: Timestamp;
+  eventLocation?: string;
+  notes?: string;
+  createdAt: Timestamp;
+  createdBy: string;
+}
+
 export interface AppData {
   deceased: DeceasedRecord[];
+  historicalDeceased: DeceasedRecord[];
+  amputees: AmputeeRecord[];
   fridge: FridgePosition[];
   settings: AppSettings;
+  users?: AppUser[];
 }
 
 export interface DeceasedRecord {
   id: string;
   refNumber: string;
   name: string;
-  gender?: string;
+  cin?: string;
+  gender: 'Masculin' | 'Féminin' | 'Autre';
+  otherGender?: string;
   dob?: Timestamp;
   dateOfDeath: Timestamp;
   timeOfDeath: string;
   cause: string;
-  origin: string;
+  origin: 'Marocain' | 'Étranger';
+  nationality?: string;
+  originDetail?: string;
   admissionDate: Timestamp;
   admissionTime: string;
   fridgePosition: number;
   status: DeceasedStatus;
   isUnknown?: boolean;
+  missingBodyParts?: string[];
+  otherMissingBodyPartsDescription?: string;
   exitDate?: Timestamp;
   exitTime?: string;
   exitNotes?: string;
+  transportMethod?: 'Ambulance' | 'Autre' | 'Autre_transport';
+  ambulanceNumber?: string;
+  takingChargeType?: 'Famille' | 'Association' | 'Autre';
+  takingChargeResponsibleName?: string;
+  takingChargeRelation?: string;
+  takingChargePhone?: string;
+  takingChargeAssociationName?: string;
+  takingChargeOtherDescription?: string;
+  takingChargeResponsibleRelation?: string;
+  takingChargeResponsibleContact?: string;
+  transportType?: string;
+  transportDetails?: string;
+  destination?: string;
+  destinationType?: 'Kenitra' | 'Hors_region';
+  destinationCityOrCommune?: string;
+  destinationPrecise?: string;
+  destinationRegion?: string;
+  transferType?: 'Intra_regional' | 'Extra_regional';
   notes?: string;
   timeline: TimelineEvent[];
   createdBy: string;
   createdAt: Timestamp;
   updatedAt: Timestamp;
+  isHistorical?: boolean;
 }
 
 export type FridgeStatus = 'available' | 'occupied' | 'panne' | 'out_of_service';

@@ -168,7 +168,7 @@ export function DeceasedList({ data, onSelectDeceased, onNavigate }: DeceasedLis
                             )}
                           </div>
                           <span className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">
-                            {record.gender === 'M' ? 'Masculin' : record.gender === 'F' ? 'Féminin' : 'Indéterminé'}
+                            {record.gender}
                           </span>
                         </div>
                       </div>
@@ -190,15 +190,19 @@ export function DeceasedList({ data, onSelectDeceased, onNavigate }: DeceasedLis
                       </div>
                     </td>
                     <td className="px-6 py-5">
-                      <div className={cn(
-                        "inline-flex items-center gap-2 px-3 py-1 rounded-lg text-xs font-black",
-                        isUrgent ? "bg-red-50 dark:bg-red-900/30 text-red-600 dark:text-red-400 border border-red-100 dark:border-red-900/30" : 
-                        isApproaching ? "bg-amber-50 dark:bg-amber-900/30 text-amber-600 dark:text-amber-400 border border-amber-100 dark:border-amber-900/30" :
-                        "bg-slate-50 dark:bg-slate-800 text-slate-600 dark:text-slate-300 border border-slate-100 dark:border-slate-700"
-                      )}>
-                        <Refrigerator size={12} />
-                        FRIGO-{record.fridgePosition.toString().padStart(2, '0')}
-                      </div>
+                      {record.fridgePosition && record.fridgePosition !== -1 ? (
+                        <div className={cn(
+                          "inline-flex items-center gap-2 px-3 py-1 rounded-lg text-xs font-black",
+                          isUrgent ? "bg-red-50 dark:bg-red-900/30 text-red-600 dark:text-red-400 border border-red-100 dark:border-red-900/30" : 
+                          isApproaching ? "bg-amber-50 dark:bg-amber-900/30 text-amber-600 dark:text-amber-400 border border-amber-100 dark:border-amber-900/30" :
+                          "bg-slate-50 dark:bg-slate-800 text-slate-600 dark:text-slate-300 border border-slate-100 dark:border-slate-700"
+                        )}>
+                          <Refrigerator size={12} />
+                          FRIGO-{record.fridgePosition.toString().padStart(2, '0')}
+                        </div>
+                      ) : (
+                        <span className="text-xs font-medium text-slate-400 dark:text-slate-500 uppercase">Non renseigné</span>
+                      )}
                     </td>
                     <td className="px-6 py-5">
                       <div className="flex items-center gap-2">

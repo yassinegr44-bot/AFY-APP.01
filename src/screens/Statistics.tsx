@@ -10,14 +10,12 @@ import {
   Pie,
   Cell
 } from 'recharts';
-import { TrendingUp, FileDown, Calendar, Filter, Menu, MoreVertical } from 'lucide-react';
+import { TrendingUp, FileDown, Calendar, Menu, MoreVertical, User } from 'lucide-react';
 import { format } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import { cn } from '../lib/utils';
-import { jsPDF } from 'jspdf';
-import autoTable from 'jspdf-autotable';
-import { toPng } from 'html-to-image';
 import { useRef } from 'react';
+import { generateStatisticsPDF } from '../utils/pdf';
 
 interface StatisticsProps {
   data: any;
@@ -25,18 +23,28 @@ interface StatisticsProps {
 }
 
 export function Statistics({ data, onNavigate }: StatisticsProps) {
-  const { deceased } = data;
+  const { deceased, amputees } = data;
   const chartsRef = useRef<HTMLDivElement>(null);
 
   const inFacilityCount = deceased.filter((d: any) => d.status === 'in_facility').length;
   const releasedCount = deceased.filter((d: any) => d.status === 'released').length;
   const unknownCount = deceased.filter((d: any) => d.isUnknown).length;
+  const amputeesCount = amputees.length;
 
   const pieData = [
     { name: 'Actifs', value: inFacilityCount, color: '#10b981' },
     { name: 'Inconnus', value: unknownCount, color: '#f59e0b' },
     { name: 'Identifiés', value: inFacilityCount - unknownCount, color: '#3b82f6' },
     { name: 'Libérés', value: releasedCount, color: '#cbd5e1' }
+  ];
+
+  const releasedRecords = deceased.filter((d: any) => d.status === 'released' || d.isHistorical);
+  const priseFamilleCount = releasedRecords.filter((d: any) => d.takingChargeType === 'Famille').length;
+  const priseAutreCount = releasedRecords.filter((d: any) => d.takingChargeType && d.takingChargeType !== 'Famille').length; // Includes Association and Autre
+  
+  const priseEnChargeData = [
+    { name: 'Famille', value: priseFamilleCount, color: '#006050' },
+    { name: 'Autre (Association...)', value: priseAutreCount, color: '#64748b' }
   ];
 
   const last7Days = Array.from({ length: 7 }).map((_, i) => {
@@ -52,89 +60,7 @@ export function Statistics({ data, onNavigate }: StatisticsProps) {
 
   const handleDownloadReport = async (type: 'csv' | 'pdf') => {
     if (type === 'pdf') {
-      const doc = new jsPDF();
-      
-      // Title
-      doc.setFontSize(22);
-      doc.setTextColor(0, 96, 80); // #006050
-      doc.text("RAPPORT D'ACTIVITÉ INSTITUTIONNELLE", 105, 20, { align: 'center' });
-      
-      doc.setFontSize(10);
-      doc.setTextColor(150, 150, 150);
-      doc.text(`Généré le : ${format(new Date(), 'dd/MM/yyyy HH:mm')}`, 105, 30, { align: 'center' });
-
-      // Summary Stats
-      doc.setFontSize(14);
-      doc.setTextColor(50, 50, 50);
-      doc.text("RÉSUMÉ GLOBAL", 14, 45);
-      
-      autoTable(doc, {
-        startY: 50,
-        head: [['Catégorie', 'Valeur']],
-        body: [
-          ['Total Admissions', deceased.length.toString()],
-          ['Corps Présents', inFacilityCount.toString()],
-          ['Identités Inconnues', unknownCount.toString()],
-          ['Corps Libérés', releasedCount.toString()],
-        ],
-        theme: 'striped',
-        headStyles: { fillColor: [0, 96, 80] }
-      });
-
-      // Charts capture
-      if (chartsRef.current) {
-        try {
-          const imgData = await toPng(chartsRef.current, { 
-            quality: 0.95,
-            backgroundColor: '#ffffff',
-            style: {
-              borderRadius: '0'
-            },
-            // Avoid issues with external fonts/stylesheets
-            filter: (node) => {
-              const skipTags = ['LINK', 'STYLE'];
-              if (skipTags.includes(node.tagName)) {
-                // If it's a link to an external stylesheet, we might want to skip it to avoid CORS errors
-                // during the inlining process of html-to-image
-                return false;
-              }
-              return true;
-            },
-            // This can help avoid the "Cannot access rules" error by skipping the auto-inlining 
-            // of all document stylesheets if they are cross-origin
-            skipFonts: true 
-          });
-          doc.addPage();
-          doc.text("SCHÉMAS ET ANALYSES", 14, 20);
-          doc.addImage(imgData, 'PNG', 10, 30, 190, 0);
-        } catch (error) {
-          console.error('Failed to capture charts:', error);
-        }
-      }
-
-      // Deceased Table
-      doc.addPage();
-      doc.text("REGISTRE DÉTAILLÉ", 14, 20);
-      
-      const tableData = deceased.map((d: any) => [
-        d.refNumber || 'N/A',
-        d.name || 'Inconnu',
-        format(d.admissionDate.toDate(), 'dd/MM/yyyy'),
-        d.status === 'in_facility' ? 'Présent' : 'Sorti',
-        `FRIGO-${d.fridgePosition?.toString().padStart(2, '0') || '00'}`,
-        d.cause || '—'
-      ]);
-
-      autoTable(doc, {
-        startY: 30,
-        head: [['Réf', 'Nom Complet', 'Date Adm.', 'État', 'Pos.', 'Cause']],
-        body: tableData,
-        theme: 'grid',
-        headStyles: { fillColor: [0, 96, 80] },
-        styles: { fontSize: 8 }
-      });
-
-      doc.save(`rapport_afy_${format(new Date(), 'yyyyMMdd')}.pdf`);
+      generateStatisticsPDF(data);
       return;
     }
 
@@ -210,6 +136,17 @@ export function Statistics({ data, onNavigate }: StatisticsProps) {
           </div>
           <div className="absolute -right-8 -bottom-8 opacity-10 rotate-12">
             <TrendingUp size={200} />
+          </div>
+        </div>
+
+        {/* Amputee KPI Summary */}
+        <div className="bg-[#006050] dark:bg-emerald-600 rounded-2xl p-8 text-white shadow-xl shadow-[#006050]/20 dark:shadow-emerald-900/20 relative overflow-hidden transition-colors duration-300">
+          <div className="relative z-10">
+            <p className="text-[10px] font-bold uppercase tracking-widest opacity-60 mb-2">Total Amputés</p>
+            <h2 className="text-5xl font-black tracking-tighter leading-none">{amputeesCount}</h2>
+          </div>
+          <div className="absolute -right-8 -bottom-8 opacity-10 rotate-12">
+            <User size={200} />
           </div>
         </div>
 
@@ -289,6 +226,83 @@ export function Statistics({ data, onNavigate }: StatisticsProps) {
           </div>
         </div>
       </div>
+
+        {/* Distribution Prise en Charge */}
+
+        <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-100 dark:border-slate-800 p-6 shadow-sm transition-colors duration-300">
+
+          <h3 className="text-sm font-black text-slate-800 dark:text-slate-100 uppercase tracking-widest mb-8">Type de Prise en Charge (Sorties)</h3>
+
+          <div className="flex items-center">
+
+            <div className="h-40 w-40 flex-shrink-0">
+
+              <ResponsiveContainer width="100%" height="100%">
+
+                <PieChart>
+
+                  <Pie
+
+                    data={priseEnChargeData}
+
+                    cx="50%"
+
+                    cy="50%"
+
+                    innerRadius={50}
+
+                    outerRadius={70}
+
+                    paddingAngle={5}
+
+                    dataKey="value"
+
+                  >
+
+                    {priseEnChargeData.map((entry, index) => (
+
+                      <Cell key={`cell-prise-${index}`} fill={entry.color} />
+
+                    ))}
+
+                  </Pie>
+
+                </PieChart>
+
+              </ResponsiveContainer>
+
+            </div>
+
+            <div className="flex-1 pl-8 space-y-4">
+
+              {priseEnChargeData.map((item) => (
+
+                <div key={item.name} className="flex justify-between items-center">
+
+                  <div className="flex items-center gap-3">
+
+                    <div className="w-3 h-3 rounded-md" style={{ backgroundColor: item.color }} />
+
+                    <span className="text-xs font-black text-slate-500 dark:text-slate-400 uppercase tracking-widest">{item.name}</span>
+
+                  </div>
+
+                  <span className="text-sm font-black text-slate-800 dark:text-slate-100">
+
+                    {releasedRecords.length > 0 ? Math.round((item.value / releasedRecords.length) * 100) : 0}%
+
+                  </span>
+
+                </div>
+
+              ))}
+
+            </div>
+
+          </div>
+
+        </div>
+
 
       {/* Report Action Card */}
       <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-100 dark:border-slate-800 p-6 shadow-sm transition-colors duration-300">

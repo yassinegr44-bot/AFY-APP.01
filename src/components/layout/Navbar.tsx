@@ -1,4 +1,4 @@
-import { LayoutDashboard, Users, Plus, Refrigerator, BarChart2, FileText } from 'lucide-react';
+import { LayoutDashboard, Users, Plus, Refrigerator, BarChart2, FileText, User } from 'lucide-react';
 import { cn } from '../../lib/utils';
 import { useAuth } from '../../context/AuthContext';
 

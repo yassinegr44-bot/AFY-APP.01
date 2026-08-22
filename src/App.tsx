@@ -4,23 +4,31 @@ import { Navbar } from './components/layout/Navbar';
 import { Dashboard } from './screens/Dashboard';
 import { DeceasedList } from './screens/DeceasedList';
 import { NewDeceased } from './screens/NewDeceased';
+import { DeceasedDetail } from './screens/DeceasedDetail';
 import { Fridge } from './screens/Fridge';
 import { Statistics } from './screens/Statistics';
 import { Reports } from './screens/Reports';
-import { DeceasedDetail } from './screens/DeceasedDetail';
+import { ArchiveView } from './screens/ArchiveView';
+import { ArchivePDFGenerator } from './screens/ArchivePDFGenerator';
+import { AmputeeList } from './screens/AmputeeList';
+import { NewAmputee } from './screens/NewAmputee';
+import { AmputeeDetail } from './screens/AmputeeDetail';
+import { HistoricalDeceased } from './screens/HistoricalDeceased';
 import { Settings } from './screens/Settings';
 import { Login } from './screens/Login';
 import { QuickSearch } from './components/layout/QuickSearch';
+import { OperatorProfileModal } from './components/modals/OperatorProfileModal';
 import { useData } from './hooks/useData';
 
 import { ThemeProvider } from './context/ThemeContext';
 
 function AppContent() {
-  const { user, loading } = useAuth();
+  const { user, loading, showNameModal, setShowNameModal } = useAuth();
   const [currentScreen, setCurrentScreen] = useState('dashboard');
   const [selectedDeceasedId, setSelectedDeceasedId] = useState<string | null>(null);
+  const [selectedAmputeeId, setSelectedAmputeeId] = useState<string | null>(null);
   
-  const data = useData(user?.id);
+  const data = useData(user);
 
   if (loading || data.loading) {
     return (
@@ -54,17 +62,31 @@ function AppContent() {
           return <Dashboard data={data} onNavigate={setCurrentScreen} onSelectDeceased={(id) => { setSelectedDeceasedId(id); setCurrentScreen('deceased-detail'); }} />;
         }
         return <Reports data={data} onNavigate={setCurrentScreen} />;
+      case 'archive-view':
+        return <ArchiveView data={data} onNavigate={setCurrentScreen} onSelectDeceased={(id) => { setSelectedDeceasedId(id); setCurrentScreen('deceased-detail'); }} />;
+      case 'archive-pdf-generator':
+        return <ArchivePDFGenerator data={data} onNavigate={setCurrentScreen} />;
       case 'statistics':
         if (user?.role !== 'admin') {
           return <Dashboard data={data} onNavigate={setCurrentScreen} onSelectDeceased={(id) => { setSelectedDeceasedId(id); setCurrentScreen('deceased-detail'); }} />;
         }
         return <Statistics data={data} onNavigate={setCurrentScreen} />;
       case 'settings':
-        return <Settings data={data} onNavigate={setCurrentScreen} />;
+        return <Settings data={data} onNavigate={setCurrentScreen} onOpenProfile={() => setShowNameModal(true)} />;
+      case 'historical-deceased':
+        return <HistoricalDeceased data={data} onNavigate={setCurrentScreen} />;
       case 'deceased-detail':
         const record = data.deceased.find((d: any) => d.id === selectedDeceasedId);
         if (!record) return <DeceasedList data={data} onNavigate={setCurrentScreen} onSelectDeceased={(id) => { setSelectedDeceasedId(id); setCurrentScreen('deceased-detail'); }} />;
-        return <DeceasedDetail record={record} onBack={() => setCurrentScreen('deceased')} onExit={(exitData) => data.registerExit(record.id, exitData)} />;
+        return <DeceasedDetail record={record} users={data.users} onBack={() => setCurrentScreen('deceased')} onExit={(exitData) => data.registerExit(record.id, exitData)} onUpdateIdentity={async (identityData) => { await data.updateDeceasedIdentity(record.id, identityData); }} />;
+      case 'amputee':
+        return <AmputeeList data={data} onNavigate={setCurrentScreen} onSelectAmputee={(id) => { setSelectedAmputeeId(id); setCurrentScreen('amputee-detail'); }} />;
+      case 'new-amputee':
+        return <NewAmputee data={data} onComplete={() => setCurrentScreen('amputee')} />;
+      case 'amputee-detail':
+        const amputee = data.amputees.find((a: any) => a.id === selectedAmputeeId);
+        if (!amputee) return <AmputeeList data={data} onNavigate={setCurrentScreen} onSelectAmputee={(id) => { setSelectedAmputeeId(id); setCurrentScreen('amputee-detail'); }} />;
+        return <AmputeeDetail record={amputee} users={data.users} onBack={() => setCurrentScreen('amputee')} />;
       default:
         return <Dashboard data={data} onNavigate={setCurrentScreen} onSelectDeceased={(id) => { setSelectedDeceasedId(id); setCurrentScreen('deceased-detail'); }} />;
     }
@@ -72,6 +94,10 @@ function AppContent() {
 
   return (
     <div className="flex flex-col min-h-screen theme-bg-app pb-24 transition-colors duration-300">
+      <OperatorProfileModal 
+        isOpen={showNameModal} 
+        onClose={() => setShowNameModal(false)} 
+      />
       <main className="flex-1 p-6 overflow-y-auto">
         {currentScreen !== 'new' && currentScreen !== 'login' && (
           <QuickSearch records={data.deceased} onSelect={handleSelectFromSearch} />

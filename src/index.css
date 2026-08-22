@@ -30,6 +30,12 @@
   }
 }
 
+@media print {
+  .no-print { display: none !important; }
+  .print-only { display: block !important; }
+  .page-break-after-always { page-break-after: always; }
+}
+
 /* Global utility classes for theme-aware backgrounds */
 .theme-bg-app { background-color: var(--bg-app) !important; }
 .theme-bg-card { background-color: var(--bg-card) !important; }

@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Users, LogIn, LogOut, Refrigerator, AlertTriangle, Plus, ArrowRightLeft, Clock, Info, MoreVertical, Shield, User, Settings2, Check, X, Eye, EyeOff } from 'lucide-react';
+import { Users, LogIn, LogOut, Refrigerator, AlertTriangle, Plus, ArrowRightLeft, Clock, Info, MoreVertical, Shield, User, Settings2, Check, X, Eye, EyeOff, Folder } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { differenceInDays, formatDistanceToNow } from 'date-fns';
 import { fr } from 'date-fns/locale';
@@ -14,12 +14,12 @@ interface DashboardProps {
 }
 
 export function Dashboard({ data, onNavigate, onSelectDeceased }: DashboardProps) {
-  const { deceased, fridge, settings } = data;
+  const { deceased, historicalDeceased = [], fridge, settings } = data;
   const { user } = useAuth();
   const [isCustomizing, setIsCustomizing] = useState(false);
   const [visibleCards, setVisibleCards] = useState<string[]>(() => {
     const saved = localStorage.getItem('afy_dashboard_visible_cards');
-    return saved ? JSON.parse(saved) : ['in_facility', 'admissions', 'exits', 'alerts', 'approaching', 'unknown'];
+    return saved ? JSON.parse(saved) : ['in_facility', 'admissions', 'exits', 'alerts', 'approaching', 'unknown', 'historical'];
   });
 
   useEffect(() => {
@@ -135,6 +135,7 @@ export function Dashboard({ data, onNavigate, onSelectDeceased }: DashboardProps
                   { id: 'alerts', label: 'Alertes', icon: AlertTriangle },
                   { id: 'approaching', label: 'Approche', icon: Clock },
                   { id: 'unknown', label: 'Inconnus', icon: Users },
+                  { id: 'historical', label: 'Historiques', icon: Folder },
                 ].map(card => (
                   <button
                     key={card.id}
@@ -219,6 +220,16 @@ export function Dashboard({ data, onNavigate, onSelectDeceased }: DashboardProps
             color="slate"
             onClick={() => onNavigate('deceased')}
             urgent={unknownCount > 0}
+          />
+        )}
+        {visibleCards.includes('historical') && (
+          <KpiCard 
+            label="Historiques" 
+            value={historicalDeceased.length}
+            subtitle="Anciens dossiers"
+            icon={Folder}
+            color="slate"
+            onClick={() => onNavigate('historical-deceased')}
           />
         )}
       </section>
@@ -309,18 +320,30 @@ export function Dashboard({ data, onNavigate, onSelectDeceased }: DashboardProps
       {/* Quick Actions */}
       <section>
         <h2 className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-3">Actions Rapides</h2>
-        <div className="flex gap-3">
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
           <button 
             onClick={() => onNavigate('new')}
-            className="flex-1 bg-[#006050] dark:bg-emerald-600 text-white py-3 rounded-lg font-bold flex items-center justify-center gap-2 shadow-lg shadow-[#006050]/10 dark:shadow-emerald-900/20 active:scale-95 transition-all"
+            className="bg-[#006050] dark:bg-emerald-600 text-white py-3 rounded-lg font-bold flex items-center justify-center gap-2 shadow-lg shadow-[#006050]/10 dark:shadow-emerald-900/20 active:scale-95 transition-all text-xs"
           >
-            <Plus size={18} strokeWidth={3} /> Nouvelle Admission
+            <Plus size={16} strokeWidth={3} /> Nouvelle Admission
+          </button>
+          <button 
+            onClick={() => onNavigate('new-amputee')}
+            className="bg-[#006050] dark:bg-emerald-600 text-white py-3 rounded-lg font-bold flex items-center justify-center gap-2 shadow-lg shadow-[#006050]/10 dark:shadow-emerald-900/20 active:scale-95 transition-all text-xs"
+          >
+            <Plus size={16} strokeWidth={3} /> Membre amputé
           </button>
           <button 
             onClick={() => onNavigate('frigo')}
-            className="flex-1 bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 py-3 rounded-lg font-bold text-slate-700 dark:text-slate-200 flex items-center justify-center gap-2 shadow-sm active:scale-95 transition-all"
+            className="bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 py-3 rounded-lg font-bold text-slate-700 dark:text-slate-200 flex items-center justify-center gap-2 shadow-sm active:scale-95 transition-all text-xs"
           >
-            <ArrowRightLeft size={18} /> Libérer Position
+            <ArrowRightLeft size={16} /> Libérer Position
+          </button>
+          <button 
+            onClick={() => onNavigate('historical-deceased')}
+            className="bg-slate-800 hover:bg-slate-900 dark:bg-slate-700 dark:hover:bg-slate-600 text-white py-3 rounded-lg font-bold flex items-center justify-center gap-2 shadow-lg active:scale-95 transition-all text-xs"
+          >
+            <Folder size={16} /> Dossier Historique
           </button>
         </div>
       </section>

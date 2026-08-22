@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Settings as SettingsIcon, Bell, Shield, LogOut, Save, ChevronRight, User, Menu, MoreVertical, BadgeCheck, Moon, Sun, CheckCircle } from 'lucide-react';
-import { doc, updateDoc, collection, query, getDocs, deleteDoc, Timestamp } from 'firebase/firestore';
+import { doc, updateDoc, collection, query, getDocs, deleteDoc, Timestamp, where } from 'firebase/firestore';
 import { db, auth } from '../lib/firebase';
 import { motion } from 'motion/react';
 import { signOut } from 'firebase/auth';
@@ -13,9 +13,10 @@ import { AppUser } from '../types';
 interface SettingsProps {
   data: any;
   onNavigate: (screen: string) => void;
+  onOpenProfile?: () => void;
 }
 
-export function Settings({ data, onNavigate }: SettingsProps) {
+export function Settings({ data, onNavigate, onOpenProfile }: SettingsProps) {
   const { settings } = data;
   const { user } = useAuth();
   const { theme, toggleTheme } = useTheme();
@@ -163,27 +164,35 @@ export function Settings({ data, onNavigate }: SettingsProps) {
           </span>
         </div>
         
-        <div className="flex items-center gap-4 p-4 bg-slate-50 dark:bg-slate-950 rounded-2xl mb-6 transition-colors duration-300">
-          <div className="w-14 h-14 bg-white dark:bg-slate-900 border-2 border-emerald-100 dark:border-emerald-900/30 rounded-2xl flex items-center justify-center text-[#006050] dark:text-emerald-400 shadow-sm relative">
-            <User size={28} />
-            {user?.role === 'admin' && (
-              <div className="absolute -top-1 -right-1 bg-purple-600 text-white p-0.5 rounded-full border-2 border-white dark:border-slate-900">
-                <BadgeCheck size={12} />
-              </div>
-            )}
+        <div 
+          onClick={onOpenProfile}
+          className="flex items-center justify-between p-4 bg-slate-50 dark:bg-slate-950 rounded-2xl mb-6 transition-colors duration-300 cursor-pointer hover:bg-slate-100 dark:hover:bg-slate-900 border border-transparent hover:border-emerald-200 dark:hover:border-emerald-900/40"
+        >
+          <div className="flex items-center gap-4">
+            <div className="w-14 h-14 bg-white dark:bg-slate-900 border-2 border-emerald-100 dark:border-emerald-900/30 rounded-2xl flex items-center justify-center text-[#006050] dark:text-emerald-400 shadow-sm relative">
+              <User size={28} />
+              {user?.role === 'admin' && (
+                <div className="absolute -top-1 -right-1 bg-purple-600 text-white p-0.5 rounded-full border-2 border-white dark:border-slate-900">
+                  <BadgeCheck size={12} />
+                </div>
+              )}
+            </div>
+            <div>
+              <p className="text-base font-black text-slate-800 dark:text-slate-100 tracking-tight leading-none">{user?.name}</p>
+              <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mt-1.5">{user?.role === 'admin' ? 'Administrateur Système' : 'Agent de Santé'}</p>
+              <p className="text-[10px] text-emerald-600 dark:text-emerald-400 font-semibold mt-0.5">Cliquez pour modifier votre nom d'opérateur</p>
+            </div>
           </div>
-          <div>
-            <p className="text-base font-black text-slate-800 dark:text-slate-100 tracking-tight leading-none">{user?.name}</p>
-            <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mt-1.5">{user?.role === 'admin' ? 'Administrateur Système' : 'Agent de Santé'}</p>
-          </div>
+          <ChevronRight size={20} className="text-slate-400" />
         </div>
 
         <div className="space-y-2">
           <SettingsItem 
             icon={User} 
-            title="Mon Profil" 
-            subtitle="Gérer les informations personnelles" 
+            title="Mon Profil & Signature" 
+            subtitle="Modifier mon nom d'opérateur officiel" 
             color="emerald"
+            onClick={onOpenProfile}
           />
           <SettingsItem 
             icon={Shield} 
@@ -313,9 +322,12 @@ export function Settings({ data, onNavigate }: SettingsProps) {
   );
 }
 
-function SettingsItem({ icon: Icon, title, subtitle }: any) {
+function SettingsItem({ icon: Icon, title, subtitle, onClick }: any) {
   return (
-    <div className="flex items-center justify-between p-4 hover:bg-slate-50 dark:hover:bg-slate-950 rounded-xl transition-all cursor-pointer group">
+    <div 
+      onClick={onClick}
+      className="flex items-center justify-between p-4 hover:bg-slate-50 dark:hover:bg-slate-950 rounded-xl transition-all cursor-pointer group"
+    >
       <div className="flex items-center gap-4">
         <div className="w-10 h-10 bg-emerald-50 dark:bg-[#006050]/20 text-[#006050] dark:text-emerald-400 rounded-xl flex items-center justify-center">
           <Icon size={20} />
