@@ -23,7 +23,7 @@ interface StatisticsProps {
 }
 
 export function Statistics({ data, onNavigate }: StatisticsProps) {
-  const { deceased, amputees } = data;
+  const { deceased = [], amputees = [] } = data || {};
   const chartsRef = useRef<HTMLDivElement>(null);
 
   const inFacilityCount = deceased.filter((d: any) => d.status === 'in_facility').length;

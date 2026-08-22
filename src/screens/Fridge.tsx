@@ -13,7 +13,7 @@ interface FridgeProps {
 }
 
 export function Fridge({ data, onSelectDeceased, onNavigate }: FridgeProps) {
-  const { fridge, deceased } = data;
+  const { fridge = [], deceased = [] } = data || {};
   const { user } = useAuth();
   const [loading, setLoading] = useState<string | null>(null);
 

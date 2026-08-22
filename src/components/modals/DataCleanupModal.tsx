@@ -9,7 +9,22 @@ interface DataCleanupModalProps {
 }
 
 export function DataCleanupModal({ isOpen, onClose, onConfirm }: DataCleanupModalProps) {
-  const [selectedPeriod, setSelectedPeriod] = useState('08-2026');
+  const months = React.useMemo(() => {
+    const list = [];
+    const date = new Date();
+    for (let i = 0; i < 12; i++) {
+      const monthNum = String(date.getMonth() + 1).padStart(2, '0');
+      const yearNum = date.getFullYear();
+      const value = `${monthNum}-${yearNum}`;
+      const label = date.toLocaleString('fr-FR', { month: 'long', year: 'numeric' });
+      const capitalizedLabel = label.charAt(0).toUpperCase() + label.slice(1);
+      list.push({ value, label: capitalizedLabel });
+      date.setMonth(date.getMonth() - 1);
+    }
+    return list;
+  }, []);
+
+  const [selectedPeriod, setSelectedPeriod] = useState(months[0]?.value || '08-2026');
   const [step, setStep] = useState(1);
   const [selectedAction, setSelectedAction] = useState<'archive' | 'delete'>('archive');
   
@@ -42,10 +57,11 @@ export function DataCleanupModal({ isOpen, onClose, onConfirm }: DataCleanupModa
                   <select 
                     value={selectedPeriod} 
                     onChange={(e) => setSelectedPeriod(e.target.value)}
-                    className="w-full p-3 bg-slate-50 dark:bg-slate-950 rounded-xl border border-slate-100 dark:border-slate-800"
+                    className="w-full p-3 bg-slate-50 dark:bg-slate-950 rounded-xl border border-slate-100 dark:border-slate-800 text-slate-800 dark:text-slate-100 font-medium"
                   >
-                    <option value="08-2026">Août 2026</option>
-                    <option value="07-2026">Juillet 2026</option>
+                    {months.map(m => (
+                      <option key={m.value} value={m.value}>{m.label}</option>
+                    ))}
                   </select>
                 </div>
                 <div className="flex gap-3">

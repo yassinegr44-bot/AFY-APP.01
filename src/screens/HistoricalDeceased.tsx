@@ -30,7 +30,7 @@ interface HistoricalDeceasedProps {
 }
 
 export function HistoricalDeceased({ data, onNavigate }: HistoricalDeceasedProps) {
-  const { historicalDeceased, registerHistoricalDeceased } = data;
+  const { historicalDeceased = [], registerHistoricalDeceased } = data || {};
   const { user } = useAuth();
   
   const [viewState, setViewState] = useState<'list' | 'create' | 'detail' | 'edit'>('list');

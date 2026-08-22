@@ -13,7 +13,7 @@ interface DeceasedListProps {
 }
 
 export function DeceasedList({ data, onSelectDeceased, onNavigate }: DeceasedListProps) {
-  const { deceased, settings } = data;
+  const { deceased = [], settings = { alertThresholdDays: 15 } } = data || {};
   const [searchTerm, setSearchTerm] = useState('');
   const [filter, setFilter] = useState<'all' | 'in_facility' | 'released' | 'urgent'>('all');
 

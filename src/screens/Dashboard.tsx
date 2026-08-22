@@ -14,7 +14,7 @@ interface DashboardProps {
 }
 
 export function Dashboard({ data, onNavigate, onSelectDeceased }: DashboardProps) {
-  const { deceased, historicalDeceased = [], fridge, settings } = data;
+  const { deceased = [], historicalDeceased = [], fridge = [], settings = { alertThresholdDays: 15 } } = data || {};
   const { user } = useAuth();
   const [isCustomizing, setIsCustomizing] = useState(false);
   const [visibleCards, setVisibleCards] = useState<string[]>(() => {

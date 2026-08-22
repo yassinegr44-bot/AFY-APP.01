@@ -10,10 +10,11 @@ interface ArchiveViewProps {
 }
 
 export function ArchiveView({ data, onNavigate, onSelectDeceased }: ArchiveViewProps) {
+  const { deceased = [] } = data || {};
   const [searchTerm, setSearchTerm] = useState('');
   const [isExporting, setIsExporting] = useState(false);
 
-  const filteredDeceased = data.deceased.filter((d: DeceasedRecord) => 
+  const filteredDeceased = deceased.filter((d: DeceasedRecord) => 
     d.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
     d.refNumber.toLowerCase().includes(searchTerm.toLowerCase())
   ).sort((a: DeceasedRecord, b: DeceasedRecord) => b.admissionDate.toMillis() - a.admissionDate.toMillis());
@@ -21,7 +22,7 @@ export function ArchiveView({ data, onNavigate, onSelectDeceased }: ArchiveViewP
   const handleQuickDownload = () => {
     setIsExporting(true);
     setTimeout(() => {
-      generateDossiersPDF(filteredDeceased.length > 0 ? filteredDeceased : data.deceased);
+      generateDossiersPDF(filteredDeceased.length > 0 ? filteredDeceased : deceased);
       setIsExporting(false);
     }, 200);
   };
@@ -31,7 +32,7 @@ export function ArchiveView({ data, onNavigate, onSelectDeceased }: ArchiveViewP
       <section className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <div>
           <h1 className="text-xl font-black text-slate-800 dark:text-slate-100 tracking-tight">Registre Complet des Dossiers</h1>
-          <p className="text-xs text-slate-500">{data.deceased.length} dossiers archivés au total</p>
+          <p className="text-xs text-slate-500">{deceased.length} dossiers archivés au total</p>
         </div>
         <div className="flex items-center gap-2 w-full sm:w-auto">
           <button 
@@ -41,7 +42,7 @@ export function ArchiveView({ data, onNavigate, onSelectDeceased }: ArchiveViewP
           </button>
           <button 
             onClick={handleQuickDownload}
-            disabled={isExporting || data.deceased.length === 0}
+            disabled={isExporting || deceased.length === 0}
             className="bg-[#006050] hover:bg-[#004d40] text-white px-4 py-2.5 rounded-xl text-sm font-black flex items-center gap-2 shadow-sm transition-all disabled:opacity-50">
             {isExporting ? (
               <>

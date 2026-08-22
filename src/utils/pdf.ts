@@ -151,7 +151,8 @@ const drawOfficialHeader = (doc: jsPDF, reportTitle: string) => {
 
 export const generateStatisticsPDF = async (data: any) => {
   await ensureImagesLoaded();
-  const { deceased, amputees } = data;
+  const deceased = data?.deceased || [];
+  const amputees = data?.amputees || [];
   const inFacilityCount = deceased.filter((d: any) => d.status === 'in_facility').length;
   const releasedCount = deceased.filter((d: any) => d.status === 'released').length;
   const unknownCount = deceased.filter((d: any) => d.isUnknown).length;
@@ -371,6 +372,7 @@ export const generateStatisticsPDF = async (data: any) => {
 
 export const generateDossiersPDF = async (records: DeceasedRecord[], users?: AppUser[]) => {
   await ensureImagesLoaded();
+  const safeRecords = records || [];
   const doc = new jsPDF();
   const pageWidth = doc.internal.pageSize.getWidth();
   const pageHeight = doc.internal.pageSize.getHeight();
@@ -398,9 +400,9 @@ export const generateDossiersPDF = async (records: DeceasedRecord[], users?: App
   doc.setFontSize(10.5);
   doc.setFont('helvetica', 'bold');
   doc.setTextColor(...COLOR_SECONDARY);
-  doc.text(`TABLE DES MATIÈRES ET RÉPERTOIRE CLICQUABLE (${records.length} dossiers)`, 14, 68);
+  doc.text(`TABLE DES MATIÈRES ET RÉPERTOIRE CLICQUABLE (${safeRecords.length} dossiers)`, 14, 68);
 
-  const tocData = records.map((r, idx) => {
+  const tocData = safeRecords.map((r, idx) => {
     const targetPage = idx + 2;
     return [
       `#${r.refNumber || 'N/A'}`,
@@ -468,7 +470,7 @@ export const generateDossiersPDF = async (records: DeceasedRecord[], users?: App
 
     doc.setFontSize(8.5);
     doc.setFont('helvetica', 'normal');
-    doc.text(`Dossier ${index + 1} sur ${records.length} | AFY Système Hospitalier`, 20, currentY + 16);
+    doc.text(`Dossier ${index + 1} sur ${safeRecords.length} | AFY Système Hospitalier`, 20, currentY + 16);
 
     // Bouton Cliquable de retour au Sommaire / Recherche en haut à droite
     doc.setFillColor(...COLOR_WHITE);

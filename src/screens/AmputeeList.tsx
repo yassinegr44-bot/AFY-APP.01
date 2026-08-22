@@ -10,7 +10,7 @@ interface AmputeeListProps {
 
 export function AmputeeList({ data, onNavigate, onSelectAmputee }: AmputeeListProps) {
   const [searchTerm, setSearchTerm] = useState('');
-  const { amputees } = data;
+  const { amputees = [] } = data || {};
 
   const filteredAmputees = amputees.filter(a => 
     a.name.toLowerCase().includes(searchTerm.toLowerCase()) || 

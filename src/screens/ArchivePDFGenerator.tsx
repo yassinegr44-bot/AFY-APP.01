@@ -10,12 +10,13 @@ interface ArchivePDFGeneratorProps {
 }
 
 export function ArchivePDFGenerator({ data, onNavigate }: ArchivePDFGeneratorProps) {
+  const { deceased = [], users = [] } = data || {};
   const [isGenerating, setIsGenerating] = useState(false);
   const [downloadSuccess, setDownloadSuccess] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<'all' | 'in_facility' | 'released'>('all');
 
-  const filteredRecords = data.deceased.filter((d: DeceasedRecord) => {
+  const filteredRecords = deceased.filter((d: DeceasedRecord) => {
     const matchesSearch = 
       d.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
       d.refNumber.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -34,7 +35,7 @@ export function ArchivePDFGenerator({ data, onNavigate }: ArchivePDFGeneratorPro
       setDownloadSuccess(false);
       
       setTimeout(() => {
-        generateDossiersPDF(recordsToExport.length > 0 ? recordsToExport : data.deceased, data.users);
+        generateDossiersPDF(recordsToExport.length > 0 ? recordsToExport : deceased, users);
         setIsGenerating(false);
         setDownloadSuccess(true);
         setTimeout(() => setDownloadSuccess(false), 5000);
@@ -66,7 +67,7 @@ export function ArchivePDFGenerator({ data, onNavigate }: ArchivePDFGeneratorPro
           <div>
             <h1 className="text-lg font-black text-slate-800 dark:text-slate-100 flex items-center gap-2">
               <FileText size={20} className="text-[#006050]" />
-              Registre & Recherche de Dossiers ({data.deceased.length} dossiers au total)
+              Registre & Recherche de Dossiers ({deceased.length} dossiers au total)
             </h1>
             <p className="text-xs text-slate-500">
               Recherchez un dossier, accédez-y directement, ou téléchargez le PDF complet interactif.
@@ -87,8 +88,8 @@ export function ArchivePDFGenerator({ data, onNavigate }: ArchivePDFGeneratorPro
           )}
 
           <button 
-            onClick={() => handleGeneratePDF(data.deceased)}
-            disabled={isGenerating || data.deceased.length === 0}
+            onClick={() => handleGeneratePDF(deceased)}
+            disabled={isGenerating || deceased.length === 0}
             className="bg-[#006050] hover:bg-[#004d40] text-white px-5 py-2.5 rounded-xl font-black text-sm flex items-center justify-center gap-2 shadow-sm transition-all disabled:opacity-50"
           >
             {isGenerating ? (
@@ -99,7 +100,7 @@ export function ArchivePDFGenerator({ data, onNavigate }: ArchivePDFGeneratorPro
             ) : (
               <>
                 <Download size={18} />
-                Télécharger Registre PDF ({data.deceased.length})
+                Télécharger Registre PDF ({deceased.length})
               </>
             )}
           </button>
@@ -141,19 +142,19 @@ export function ArchivePDFGenerator({ data, onNavigate }: ArchivePDFGeneratorPro
               onClick={() => setStatusFilter('all')}
               className={`px-3 py-2 rounded-xl text-xs font-bold transition-colors ${statusFilter === 'all' ? 'bg-[#006050] text-white' : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300'}`}
             >
-              Tous ({data.deceased.length})
+              Tous ({deceased.length})
             </button>
             <button 
               onClick={() => setStatusFilter('in_facility')}
               className={`px-3 py-2 rounded-xl text-xs font-bold transition-colors ${statusFilter === 'in_facility' ? 'bg-amber-600 text-white' : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300'}`}
             >
-              Admis ({data.deceased.filter(d => d.status === 'in_facility').length})
+              Admis ({deceased.filter(d => d.status === 'in_facility').length})
             </button>
             <button 
               onClick={() => setStatusFilter('released')}
               className={`px-3 py-2 rounded-xl text-xs font-bold transition-colors ${statusFilter === 'released' ? 'bg-emerald-600 text-white' : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300'}`}
             >
-              Libérés ({data.deceased.filter(d => d.status === 'released').length})
+              Libérés ({deceased.filter(d => d.status === 'released').length})
             </button>
           </div>
         </div>
@@ -200,7 +201,7 @@ export function ArchivePDFGenerator({ data, onNavigate }: ArchivePDFGeneratorPro
       <div className="space-y-6">
         {filteredRecords.map((d) => (
           <div key={d.id} className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden">
-            <DossierPrintable record={d} users={data.users} />
+            <DossierPrintable record={d} users={users} />
           </div>
         ))}
       </div>

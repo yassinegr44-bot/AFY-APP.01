@@ -25,6 +25,8 @@ export function Settings({ data, onNavigate, onOpenProfile }: SettingsProps) {
   const [saved, setSaved] = useState(false);
   const [isCleanupModalOpen, setIsCleanupModalOpen] = useState(false);
   const [users, setUsers] = useState<AppUser[]>([]);
+  const [userToDelete, setUserToDelete] = useState<AppUser | null>(null);
+  const [deletingUser, setDeletingUser] = useState(false);
 
   useEffect(() => {
     if (user?.role === 'admin') {
@@ -44,6 +46,34 @@ export function Settings({ data, onNavigate, onOpenProfile }: SettingsProps) {
   const demoteToAgent = async (userId: string) => {
     await updateDoc(doc(db, 'users', userId), { role: 'agent' });
     setUsers(users.map(u => u.id === userId ? { ...u, role: 'agent' } : u));
+  };
+
+  const handleDeleteUserConfirm = async () => {
+    if (!userToDelete) return;
+    setDeletingUser(true);
+    try {
+      // 1. Delete Firestore user document directly
+      await deleteDoc(doc(db, 'users', userToDelete.id));
+
+      // 2. Call backend API to clean up Auth
+      const res = await fetch('/api/admin/delete-user', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ uid: userToDelete.id })
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.error || 'Erreur lors de la suppression');
+      }
+      setUsers(users.filter(u => u.id !== userToDelete.id));
+      setUserToDelete(null);
+      alert("Le compte utilisateur a été supprimé définitivement.");
+    } catch (err: any) {
+      console.error(err);
+      alert(`Erreur : ${err.message || 'Impossible de supprimer l\'utilisateur'}`);
+    } finally {
+      setDeletingUser(false);
+    }
   };
 
   const handleSave = async () => {
@@ -71,21 +101,34 @@ export function Settings({ data, onNavigate, onOpenProfile }: SettingsProps) {
     const startDate = new Date(year, month - 1, 1);
     const endDate = new Date(year, month, 0, 23, 59, 59);
 
-    const q = query(
+    const qDeceased = query(
       collection(db, 'deceased'),
       where('createdAt', '>=', Timestamp.fromDate(startDate)),
       where('createdAt', '<=', Timestamp.fromDate(endDate))
     );
 
-    const snapshot = await getDocs(q);
+    const qAmputees = query(
+      collection(db, 'amputees'),
+      where('createdAt', '>=', Timestamp.fromDate(startDate)),
+      where('createdAt', '<=', Timestamp.fromDate(endDate))
+    );
+
+    const [snapshotDeceased, snapshotAmputees] = await Promise.all([
+      getDocs(qDeceased),
+      getDocs(qAmputees)
+    ]);
     
+    const totalCount = snapshotDeceased.size + snapshotAmputees.size;
+
     if (action === 'delete') {
-      const deletePromises = snapshot.docs.map(doc => deleteDoc(doc.ref));
+      const deletePromises = [
+        ...snapshotDeceased.docs.map(doc => deleteDoc(doc.ref)),
+        ...snapshotAmputees.docs.map(doc => deleteDoc(doc.ref))
+      ];
       await Promise.all(deletePromises);
-      alert(`${snapshot.size} enregistrements supprimés.`);
+      alert(`${totalCount} enregistrements supprimés (décès et amputés).`);
     } else {
-      // Archive logic would go here, e.g., move to another collection
-      alert(`${snapshot.size} enregistrements archivés.`);
+      alert(`${totalCount} enregistrements archivés.`);
     }
   };
 
@@ -244,27 +287,79 @@ export function Settings({ data, onNavigate, onOpenProfile }: SettingsProps) {
               {users.map(u => (
                 <div key={u.id} className="flex items-center justify-between p-4 bg-slate-50 dark:bg-slate-950 rounded-xl">
                   <div>
-                    <p className="text-sm font-bold text-slate-800 dark:text-slate-100">{u.name}</p>
-                    <p className="text-[10px] text-slate-400 font-medium">{u.email} - {u.role}</p>
+                    <p className="text-sm font-bold text-slate-800 dark:text-slate-100">{u.name || 'Sans nom'} {u.id === user?.uid && '(Vous)'}</p>
+                    <p className="text-[10px] text-slate-400 font-medium">{u.email} - <span className="uppercase font-bold">{u.role}</span></p>
                   </div>
-                  {u.role !== 'admin' ? (
-                    <button 
-                      onClick={() => promoteToAdmin(u.id)}
-                      className="text-[10px] font-black uppercase tracking-wider bg-purple-600 text-white px-3 py-1.5 rounded-lg hover:bg-purple-700"
-                    >
-                      Promouvoir
-                    </button>
-                  ) : u.id !== user?.uid && (
-                    <button 
-                      onClick={() => demoteToAgent(u.id)}
-                      className="text-[10px] font-black uppercase tracking-wider bg-slate-600 text-white px-3 py-1.5 rounded-lg hover:bg-slate-700"
-                    >
-                      Rétrograder
-                    </button>
-                  )}
+                  <div className="flex items-center gap-2">
+                    {u.role !== 'admin' ? (
+                      <button 
+                        onClick={() => promoteToAdmin(u.id)}
+                        className="text-[10px] font-black uppercase tracking-wider bg-purple-600 text-white px-3 py-1.5 rounded-lg hover:bg-purple-700 transition-colors"
+                      >
+                        Promouvoir
+                      </button>
+                    ) : u.id !== user?.uid && (
+                      <button 
+                        onClick={() => demoteToAgent(u.id)}
+                        className="text-[10px] font-black uppercase tracking-wider bg-slate-600 text-white px-3 py-1.5 rounded-lg hover:bg-slate-700 transition-colors"
+                      >
+                        Rétrograder
+                      </button>
+                    )}
+                    {u.id !== user?.uid && (
+                      <button 
+                        onClick={() => setUserToDelete(u)}
+                        className="text-[10px] font-black uppercase tracking-wider bg-red-600 text-white px-3 py-1.5 rounded-lg hover:bg-red-700 transition-colors"
+                        title="Supprimer définitivement le compte"
+                      >
+                        Supprimer
+                      </button>
+                    )}
+                  </div>
                 </div>
               ))}
             </div>
+
+            {/* Confirmation Modal for User Deletion */}
+            {userToDelete && (
+              <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+                <motion.div 
+                  initial={{ opacity: 0, scale: 0.95 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  className="bg-white dark:bg-slate-900 rounded-2xl max-w-md w-full p-6 border border-red-200 dark:border-red-900/40 shadow-2xl"
+                >
+                  <div className="w-12 h-12 bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400 rounded-xl flex items-center justify-center mb-4 mx-auto">
+                    <Shield size={24} />
+                  </div>
+                  <h3 className="text-lg font-black text-slate-900 dark:text-slate-100 text-center mb-2">
+                    Suppression définitive du compte
+                  </h3>
+                  <p className="text-xs text-slate-600 dark:text-slate-400 text-center mb-6 leading-relaxed">
+                    Êtes-vous sûr de vouloir supprimer définitivement le compte de <strong className="text-slate-800 dark:text-slate-200">{userToDelete.name || userToDelete.email}</strong> ? 
+                    <br /><br />
+                    Cette action supprimera ses accès et son compte Firebase Auth. Les dossiers de décès et données créées par cet agent resteront intactes.
+                  </p>
+                  <div className="flex gap-3">
+                    <button
+                      type="button"
+                      disabled={deletingUser}
+                      onClick={() => setUserToDelete(null)}
+                      className="flex-1 bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 py-3 rounded-xl font-bold text-xs uppercase tracking-wider hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors"
+                    >
+                      Annuler
+                    </button>
+                    <button
+                      type="button"
+                      disabled={deletingUser}
+                      onClick={handleDeleteUserConfirm}
+                      className="flex-1 bg-red-600 text-white py-3 rounded-xl font-bold text-xs uppercase tracking-wider hover:bg-red-700 transition-colors disabled:opacity-50"
+                    >
+                      {deletingUser ? 'Suppression...' : 'Confirmer la suppression'}
+                    </button>
+                  </div>
+                </motion.div>
+              </div>
+            )}
 
             <h3 className="text-xs font-black text-red-600 dark:text-red-400 uppercase tracking-widest mt-8 mb-6 flex items-center gap-2">
               <Shield size={14} /> Administration - Gestion des données

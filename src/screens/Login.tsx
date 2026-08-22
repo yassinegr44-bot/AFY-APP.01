@@ -32,8 +32,12 @@ export function Login() {
         });
       }
     } catch (err: any) {
-      console.error(err);
-      setError('Erreur lors de la connexion Google.');
+      if (err.code === 'auth/popup-closed-by-user' || err.code === 'auth/cancelled-popup-request') {
+        setError('');
+      } else {
+        console.error(err);
+        setError('Erreur lors de la connexion Google.');
+      }
     } finally {
       setLoading(false);
     }

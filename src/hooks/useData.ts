@@ -290,5 +290,18 @@ export function useData(currentUser: AppUser | null | undefined) {
     return docRef.id;
   };
 
-  return { deceased, historicalDeceased, amputees, fridge, users, settings, loading, registerDeceased, registerHistoricalDeceased, registerAmputee, registerExit, updateDeceasedIdentity };
+  return { 
+    deceased: deceased || [], 
+    historicalDeceased: historicalDeceased || [], 
+    amputees: amputees || [], 
+    fridge: fridge || [], 
+    users: users || [], 
+    settings: settings || { alertThresholdDays: 15 }, 
+    loading, 
+    registerDeceased, 
+    registerHistoricalDeceased, 
+    registerAmputee, 
+    registerExit, 
+    updateDeceasedIdentity 
+  };
 }
