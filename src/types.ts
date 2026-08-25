@@ -49,6 +49,7 @@ export interface AmputeeRecord {
   amputationDateTime: Timestamp;
   eventLocation?: string;
   notes?: string;
+  fridgePosition?: number;
   createdAt: Timestamp;
   createdBy: string;
 }
@@ -61,6 +62,8 @@ export interface AppData {
   settings: AppSettings;
   users?: AppUser[];
 }
+
+export type CaseType = 'DÉCÈS' | 'FŒTUS' | 'MORT_NÉ' | 'ENFANT_MOINS_1_AN' | 'MEMBRE_AMPUTÉ';
 
 export interface DeceasedRecord {
   id: string;
@@ -79,8 +82,10 @@ export interface DeceasedRecord {
   admissionDate: Timestamp;
   admissionTime: string;
   fridgePosition: number;
+  fridgeNumber?: number;
   status: DeceasedStatus;
   isUnknown?: boolean;
+  caseType?: CaseType;
   missingBodyParts?: string[];
   otherMissingBodyPartsDescription?: string;
   exitDate?: Timestamp;

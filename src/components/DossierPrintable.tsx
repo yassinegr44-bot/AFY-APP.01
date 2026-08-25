@@ -113,10 +113,12 @@ export function DossierPrintable({ record, users }: DossierPrintableProps) {
         <div className="p-4 bg-slate-50 dark:bg-slate-800/60 rounded-xl border border-slate-200 dark:border-slate-700">
           <h2 className="text-xs font-black text-slate-700 dark:text-slate-300 uppercase tracking-wider mb-3">3. Logistique Morgue</h2>
           <div className="space-y-1.5 text-sm">
-            <p><strong className="text-slate-900 dark:text-white">Position Frigo :</strong> <span className="font-bold text-[#006050] dark:text-emerald-400">
-              {record.fridgePosition && record.fridgePosition !== -1 
-                ? `FRIGO-${record.fridgePosition.toString().padStart(2, '0')}` 
-                : 'Frigo Inconnu'}
+            <p><strong className="text-slate-900 dark:text-white">Affectation Frigo :</strong> <span className="font-bold text-[#006050] dark:text-emerald-400">
+              {record.fridgeNumber === 12 
+                ? `Frigo 12 (Néonat) — Pos ${record.fridgePosition.toString().padStart(2, '0')}` 
+                : record.fridgeNumber === 11
+                  ? 'Frigo 11 (Médico-Légal)'
+                  : `Frigo ${(record.fridgeNumber || record.fridgePosition).toString().padStart(2, '0')}`}
             </span></p>
             <p><strong className="text-slate-900 dark:text-white">Date Admission :</strong> <span className="text-slate-800 dark:text-slate-200">{record.admissionDate ? format(record.admissionDate.toDate(), 'dd/MM/yyyy', { locale: fr }) : '—'} {record.admissionTime}</span></p>
             {isReleased && record.exitDate && (

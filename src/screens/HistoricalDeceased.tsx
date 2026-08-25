@@ -18,7 +18,7 @@ import {
   Trash2
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
-import { Timestamp, doc, deleteDoc, updateDoc } from 'firebase/firestore';
+import { Timestamp, doc, deleteDoc, updateDoc, serverTimestamp } from 'firebase/firestore';
 import { db } from '../lib/firebase';
 import { DeceasedRecord } from '../types';
 import { cn } from '../lib/utils';
@@ -83,11 +83,13 @@ export function HistoricalDeceased({ data, onNavigate }: HistoricalDeceasedProps
 
     // Date range filter
     if (startDate || endDate) {
-      const recDate = rec.dateOfDeath.toDate();
-      const recDateStr = recDate.toISOString().split('T')[0];
-      
-      if (startDate && recDateStr < startDate) return false;
-      if (endDate && recDateStr > endDate) return false;
+      const recDate = rec.dateOfDeath?.toDate ? rec.dateOfDeath.toDate() : (rec.dateOfDeath && typeof rec.dateOfDeath !== 'object' ? new Date(rec.dateOfDeath) : null);
+      if (recDate) {
+        const recDateStr = recDate.toISOString().split('T')[0];
+        
+        if (startDate && recDateStr < startDate) return false;
+        if (endDate && recDateStr > endDate) return false;
+      }
     }
 
     return matchesSearch;
@@ -137,12 +139,12 @@ export function HistoricalDeceased({ data, onNavigate }: HistoricalDeceasedProps
       isUnknown: record.isUnknown || false,
       gender: record.gender || 'Masculin',
       otherGender: record.otherGender || '',
-      dob: record.dob ? record.dob.toDate().toISOString().split('T')[0] : '',
-      dateOfDeath: record.dateOfDeath ? record.dateOfDeath.toDate().toISOString().split('T')[0] : '',
+      dob: record.dob?.toDate ? record.dob.toDate().toISOString().split('T')[0] : (typeof record.dob === 'string' ? record.dob : ''),
+      dateOfDeath: record.dateOfDeath?.toDate ? record.dateOfDeath.toDate().toISOString().split('T')[0] : (typeof record.dateOfDeath === 'string' ? record.dateOfDeath : ''),
       timeOfDeath: record.timeOfDeath || '12:00',
-      admissionDate: record.admissionDate ? record.admissionDate.toDate().toISOString().split('T')[0] : '',
+      admissionDate: record.admissionDate?.toDate ? record.admissionDate.toDate().toISOString().split('T')[0] : (typeof record.admissionDate === 'string' ? record.admissionDate : ''),
       admissionTime: record.admissionTime || '12:00',
-      exitDate: record.exitDate ? record.exitDate.toDate().toISOString().split('T')[0] : '',
+      exitDate: record.exitDate?.toDate ? record.exitDate.toDate().toISOString().split('T')[0] : (typeof record.exitDate === 'string' ? record.exitDate : ''),
       exitTime: record.exitTime || '',
       takingChargeResponsibleName: record.takingChargeResponsibleName || '',
       takingChargeResponsibleRelation: record.takingChargeResponsibleRelation || '',
@@ -249,7 +251,7 @@ export function HistoricalDeceased({ data, onNavigate }: HistoricalDeceasedProps
         originDetail: formData.originDetail,
         notes: formData.notes,
         status: formData.exitDate ? 'released' : 'in_facility',
-        updatedAt: Timestamp.now()
+        updatedAt: serverTimestamp()
       };
 
       if (formData.exitDate) {
@@ -274,6 +276,7 @@ export function HistoricalDeceased({ data, onNavigate }: HistoricalDeceasedProps
         recordPayload.destination = null;
       }
 
+      if (!selectedRecord?.id) return;
       await updateDoc(doc(db, 'deceased', selectedRecord.id), recordPayload);
       
       // Update local state copy to render detail screen correctly
@@ -867,7 +870,7 @@ export function HistoricalDeceased({ data, onNavigate }: HistoricalDeceasedProps
               </button>
               {user?.role === 'admin' && (
                 <button 
-                  onClick={() => handleDelete(selectedRecord.id)}
+                  onClick={() => selectedRecord?.id && handleDelete(selectedRecord.id)}
                   className="p-2 text-red-400 hover:text-red-600 rounded-xl hover:bg-red-50 dark:hover:bg-red-950/20 transition-colors"
                   title="Supprimer définitivement"
                 >

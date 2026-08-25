@@ -10,7 +10,8 @@ import {
   Calendar,
   Clock,
   MapPin,
-  Stethoscope
+  Stethoscope,
+  AlertTriangle
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Timestamp } from 'firebase/firestore';
@@ -34,6 +35,7 @@ export function NewDeceased({ data, onComplete }: NewDeceasedProps) {
     gender: 'Masculin',
     otherGender: '',
     dob: '',
+    caseType: 'DÉCÈS',
     dateOfDeath: new Date().toISOString().split('T')[0],
     timeOfDeath: '12:00',
     cause: '',
@@ -51,7 +53,7 @@ export function NewDeceased({ data, onComplete }: NewDeceasedProps) {
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState(false);
 
-  const availablePositions = fridge.filter((p: any) => p.status === 'available');
+  const availablePositions = fridge.filter((p: any) => p.status === 'available' && p.type === 'normal');
 
   const bodyPartOptions = [
     "Main gauche", "Main droite", "Bras gauche", "Bras droit", 
@@ -69,12 +71,14 @@ export function NewDeceased({ data, onComplete }: NewDeceasedProps) {
     });
   };
 
+  const isSpecialCase = formData.caseType !== 'DÉCÈS';
+
   const handleNext = () => {
-    if (!formData.isUnknown && !formData.name) {
+    if (!formData.isUnknown && !formData.name && formData.caseType !== 'MEMBRE_AMPUTÉ') {
       alert("Veuillez entrer le nom complet ou cocher 'Identité inconnue'.");
       return;
     }
-    if (formData.fridgePosition === 0) {
+    if (!isSpecialCase && formData.fridgePosition === 0) {
       alert("Veuillez sélectionner une position dans le frigo.");
       return;
     }
@@ -85,7 +89,7 @@ export function NewDeceased({ data, onComplete }: NewDeceasedProps) {
   const handleSubmit = async () => {
     setLoading(true);
     try {
-      const finalName = formData.isUnknown ? "X fils de X (Inconnu)" : formData.name;
+      const finalName = formData.isUnknown ? "X fils de X (Inconnu)" : formData.name || (formData.caseType === 'MEMBRE_AMPUTÉ' ? "Membre Amputé" : "Dossier Spécial");
       
       await registerDeceased({
         ...formData,
@@ -96,9 +100,9 @@ export function NewDeceased({ data, onComplete }: NewDeceasedProps) {
         status: 'in_facility'
       });
       setSuccess(true);
-    } catch (err) {
+    } catch (err: any) {
       console.error(err);
-      alert("Erreur lors de l'enregistrement.");
+      alert(err.message || "Erreur lors de l'enregistrement.");
     } finally {
       setLoading(false);
     }
@@ -164,26 +168,55 @@ export function NewDeceased({ data, onComplete }: NewDeceasedProps) {
                 <User size={16} /> Identification
               </h3>
               <FormInput label="Numéro de référence" value="Génération automatique" readOnly className="bg-slate-50 dark:bg-slate-950 text-slate-400 font-black italic" />
-              <FormInput 
-                label="Nom complet / Identité" 
-                placeholder="Entrez le nom complet" 
-                value={formData.name} 
-                onChange={(v: string) => setFormData({...formData, name: v, isUnknown: false})} 
-                disabled={formData.isUnknown}
-                className={formData.isUnknown ? "bg-slate-50 dark:bg-slate-950 text-slate-400" : ""}
-              />
-              <div className="flex items-center gap-2 mt-2">
-                <input 
-                  type="checkbox" 
-                  id="isUnknown"
-                  className="w-4 h-4 rounded border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-950 text-[#006050] focus:ring-[#006050]"
-                  checked={formData.isUnknown}
-                  onChange={e => setFormData({...formData, isUnknown: e.target.checked, name: e.target.checked ? "X fils de X (Inconnu)" : ""})}
-                />
-                <label htmlFor="isUnknown" className="text-xs font-black text-[#006050] dark:text-emerald-400 uppercase tracking-widest cursor-pointer">
-                  Identité inconnue (X fils de X)
-                </label>
+              <div>
+                <label className="block text-xs font-bold text-slate-400 uppercase tracking-widest mb-2">Type de Cas</label>
+                <select 
+                  className="w-full px-4 py-3 bg-[#f8faff] dark:bg-slate-950 rounded-lg border border-slate-100 dark:border-slate-800 focus:outline-none focus:ring-2 focus:ring-[#006050]/10 text-sm font-medium text-slate-700 dark:text-slate-300 font-black text-[#006050] dark:text-emerald-400"
+                  value={formData.caseType}
+                  onChange={e => setFormData({...formData, caseType: e.target.value})}
+                >
+                  <option value="DÉCÈS">Décès (Standard)</option>
+                  <option value="FŒTUS">Fœtus</option>
+                  <option value="MORT_NÉ">Mort-né</option>
+                  <option value="ENFANT_MOINS_1_AN">Enfant (Fils/Fille de)</option>
+                  <option value="MEMBRE_AMPUTÉ">Membre amputé</option>
+                </select>
               </div>
+
+              {isSpecialCase && (
+                <div className="bg-amber-50 dark:bg-amber-900/20 border border-amber-100 dark:border-amber-900/30 p-4 rounded-xl flex items-start gap-3">
+                  <AlertTriangle size={20} className="text-amber-600 dark:text-amber-400 shrink-0 mt-0.5" />
+                  <div>
+                    <p className="text-xs font-black text-amber-800 dark:text-amber-300 uppercase tracking-wide">Cas spécial détecté</p>
+                    <p className="text-xs font-bold text-amber-700 dark:text-amber-400 mt-0.5">Affectation automatique : Frigo 12 — Frigo Spécial (Capacité 15 places)</p>
+                  </div>
+                </div>
+              )}
+
+              {formData.caseType !== 'MEMBRE_AMPUTÉ' && (
+                <>
+                  <FormInput 
+                    label="Nom complet / Identité" 
+                    placeholder="Entrez le nom complet" 
+                    value={formData.name} 
+                    onChange={(v: string) => setFormData({...formData, name: v, isUnknown: false})} 
+                    disabled={formData.isUnknown}
+                    className={formData.isUnknown ? "bg-slate-50 dark:bg-slate-950 text-slate-400" : ""}
+                  />
+                  <div className="flex items-center gap-2 mt-2">
+                    <input 
+                      type="checkbox" 
+                      id="isUnknown"
+                      className="w-4 h-4 rounded border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-950 text-[#006050] focus:ring-[#006050]"
+                      checked={formData.isUnknown}
+                      onChange={e => setFormData({...formData, isUnknown: e.target.checked, name: e.target.checked ? "X fils de X (Inconnu)" : ""})}
+                    />
+                    <label htmlFor="isUnknown" className="text-xs font-black text-[#006050] dark:text-emerald-400 uppercase tracking-widest cursor-pointer">
+                      Identité inconnue (X fils de X)
+                    </label>
+                  </div>
+                </>
+              )}
               <FormInput 
                 label="Numéro CIN (Optionnel)" 
                 placeholder="Ex: AB123456" 
@@ -346,17 +379,24 @@ export function NewDeceased({ data, onComplete }: NewDeceasedProps) {
                 />
               </div>
               <div>
-                <label className="block text-xs font-bold text-slate-400 uppercase tracking-widest mb-2">Position Frigo</label>
-                <select 
-                  className="w-full px-4 py-3 bg-[#f8faff] dark:bg-slate-950 rounded-lg border border-slate-100 dark:border-slate-800 focus:outline-none focus:ring-2 focus:ring-[#006050]/10 text-sm font-medium text-slate-700 dark:text-slate-300"
-                  value={formData.fridgePosition}
-                  onChange={e => setFormData({...formData, fridgePosition: parseInt(e.target.value)})}
-                >
-                  <option value="0">Assigner une position</option>
-                  {availablePositions.map((p: any) => (
-                    <option key={p.position} value={p.position}>Position {p.position.toString().padStart(2, '0')}</option>
-                  ))}
-                </select>
+                <label className="block text-xs font-bold text-slate-400 uppercase tracking-widest mb-2">Assigner un Frigo (1 à 10)</label>
+                {isSpecialCase ? (
+                  <div className="w-full px-4 py-3 bg-emerald-50 dark:bg-emerald-900/20 rounded-lg border border-emerald-100 dark:border-emerald-900/30 text-xs font-black text-emerald-800 dark:text-emerald-300 flex items-center justify-between">
+                    <span>Frigo 12 — Frigo Spécial</span>
+                    <span className="bg-emerald-200 dark:bg-emerald-800 px-2 py-0.5 rounded-full uppercase text-[10px]">Affectation automatique (Pos. 1-15)</span>
+                  </div>
+                ) : (
+                  <select 
+                    className="w-full px-4 py-3 bg-[#f8faff] dark:bg-slate-950 rounded-lg border border-slate-100 dark:border-slate-800 focus:outline-none focus:ring-2 focus:ring-[#006050]/10 text-sm font-medium text-slate-700 dark:text-slate-300"
+                    value={formData.fridgePosition}
+                    onChange={e => setFormData({...formData, fridgePosition: parseInt(e.target.value)})}
+                  >
+                    <option value="0">Sélectionner un frigo libre</option>
+                    {availablePositions.sort((a: any, b: any) => a.fridgeNumber - b.fridgeNumber).map((p: any) => (
+                      <option key={p.id} value={p.fridgeNumber}>Frigo {p.fridgeNumber.toString().padStart(2, '0')}</option>
+                    ))}
+                  </select>
+                )}
               </div>
             </div>
 
@@ -398,7 +438,7 @@ export function NewDeceased({ data, onComplete }: NewDeceasedProps) {
                 <ReviewRow label="Nom" value={formData.name || 'Identité Inconnue'} />
                 <ReviewRow label="Sexe" value={formData.gender === 'Autre' ? `Autre (${formData.otherGender})` : formData.gender} />
                 <ReviewRow label="Date Naissance" value={formData.dob || 'Non renseignée'} />
-                <ReviewRow label="Position Frigo" value={`FRIGO-${formData.fridgePosition.toString().padStart(2, '0')}`} />
+                <ReviewRow label="Affectation" value={formData.caseType === 'MEMBRE_AMPUTÉ' ? 'Frigo 11 (Légal)' : isSpecialCase ? 'Frigo 12 (Néonat)' : `FRIGO-${formData.fridgePosition.toString().padStart(2, '0')}`} />
                 <ReviewRow label="Admission" value={`${formData.admissionDate} à ${formData.admissionTime}`} />
                 <ReviewRow label="Origine" value={`${formData.origin}${formData.origin === 'Étranger' ? ` (${formData.nationality})` : ''}`} />
                 <ReviewRow label="Détail Origine" value={formData.originDetail || 'Non renseigné'} />

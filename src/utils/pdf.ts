@@ -538,10 +538,16 @@ export const generateDossiersPDF = async (records: DeceasedRecord[], users?: App
           { content: record.originDetail || 'Aucun', styles: { textColor: COLOR_DARK_TEXT } }
         ],
         [
+          { content: 'Type de cas :', styles: { fontStyle: 'bold', textColor: COLOR_DARK_TEXT } },
+          { content: record.caseType || 'DÉCÈS', styles: { fontStyle: 'bold', textColor: COLOR_PRIMARY } },
           { content: 'Statut Identité :', styles: { fontStyle: 'bold', textColor: COLOR_DARK_TEXT } },
-          { content: record.isUnknown ? 'Inconnue (X)' : 'Identifiée', styles: { textColor: COLOR_DARK_TEXT } },
+          { content: record.isUnknown ? 'Inconnue (X)' : 'Identifiée', styles: { textColor: COLOR_DARK_TEXT } }
+        ],
+        [
           { content: 'Entrée effectuée par :', styles: { fontStyle: 'bold', textColor: COLOR_DARK_TEXT } },
-          { content: formatOperatorName(record.createdBy, users, 'Opérateur'), styles: { fontStyle: 'bold', textColor: COLOR_PRIMARY } }
+          { content: formatOperatorName(record.createdBy, users, 'Opérateur'), styles: { fontStyle: 'bold', textColor: COLOR_PRIMARY } },
+          { content: '', styles: {} },
+          { content: '', styles: {} }
         ]
       ],
       theme: 'grid',

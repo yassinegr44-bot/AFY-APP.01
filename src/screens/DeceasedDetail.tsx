@@ -283,7 +283,13 @@ export function DeceasedDetail({ record, users, onBack, onExit, onUpdateIdentity
         </DetailSection>
 
         <DetailSection title="Logistique Morgue" icon={Refrigerator}>
-          <DetailRow label="Position Frigo" value={record.fridgePosition && record.fridgePosition !== -1 ? `FRIGO-${record.fridgePosition.toString().padStart(2, '0')}` : 'Frigo Inconnu'} highlight />
+          <DetailRow label="Affectation Frigo" value={
+            record.fridgeNumber === 12 
+              ? `Frigo 12 (Néonat) — Pos ${record.fridgePosition.toString().padStart(2, '0')}`
+              : record.fridgeNumber === 11
+                ? 'Frigo 11 (Médico-Légal)'
+                : `Frigo ${record.fridgeNumber || record.fridgePosition}`
+          } highlight />
           <DetailRow label="Date Admission" value={format(record.admissionDate.toDate(), 'dd/MM/yyyy HH:mm')} />
           {isReleased && record.exitDate && (
             <div className="mt-4 pt-4 border-t border-slate-100 dark:border-slate-800 space-y-2">

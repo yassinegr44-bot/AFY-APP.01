@@ -96,40 +96,20 @@ export function Settings({ data, onNavigate, onOpenProfile }: SettingsProps) {
     await signOut(auth);
   };
 
-  const handleCleanupConfirm = async (action: 'archive' | 'delete', period: string) => {
-    const [month, year] = period.split('-').map(Number);
-    const startDate = new Date(year, month - 1, 1);
-    const endDate = new Date(year, month, 0, 23, 59, 59);
-
-    const qDeceased = query(
-      collection(db, 'deceased'),
-      where('createdAt', '>=', Timestamp.fromDate(startDate)),
-      where('createdAt', '<=', Timestamp.fromDate(endDate))
-    );
-
-    const qAmputees = query(
-      collection(db, 'amputees'),
-      where('createdAt', '>=', Timestamp.fromDate(startDate)),
-      where('createdAt', '<=', Timestamp.fromDate(endDate))
-    );
-
+  const handleCleanupConfirm = async () => {
     const [snapshotDeceased, snapshotAmputees] = await Promise.all([
-      getDocs(qDeceased),
-      getDocs(qAmputees)
+      getDocs(collection(db, 'deceased')),
+      getDocs(collection(db, 'amputees'))
     ]);
-    
-    const totalCount = snapshotDeceased.size + snapshotAmputees.size;
 
-    if (action === 'delete') {
-      const deletePromises = [
-        ...snapshotDeceased.docs.map(doc => deleteDoc(doc.ref)),
-        ...snapshotAmputees.docs.map(doc => deleteDoc(doc.ref))
-      ];
-      await Promise.all(deletePromises);
-      alert(`${totalCount} enregistrements supprimés (décès et amputés).`);
-    } else {
-      alert(`${totalCount} enregistrements archivés.`);
-    }
+    const deletePromises = [
+      ...snapshotDeceased.docs.map(doc => deleteDoc(doc.ref)),
+      ...snapshotAmputees.docs.map(doc => deleteDoc(doc.ref))
+    ];
+
+    await Promise.all(deletePromises);
+    const totalCount = deletePromises.length;
+    alert(`${totalCount} enregistrements historiques (décès et amputés) ont été supprimés avec succès.`);
   };
 
   return (
@@ -370,9 +350,10 @@ export function Settings({ data, onNavigate, onOpenProfile }: SettingsProps) {
                   console.log('Cleanup button clicked');
                   setIsCleanupModalOpen(true);
                 }}
-                className="w-full text-left p-4 bg-red-50 dark:bg-red-900/10 rounded-xl border border-red-100 dark:border-red-900/30 text-red-700 dark:text-red-400 font-bold text-sm hover:bg-red-100 dark:hover:bg-red-900/20 transition-colors"
+                className="w-full text-left p-4 bg-red-50 dark:bg-red-900/10 rounded-xl border border-red-100 dark:border-red-900/30 text-red-700 dark:text-red-400 font-bold text-sm hover:bg-red-100 dark:hover:bg-red-900/20 transition-colors flex items-center justify-between"
               >
-                Nettoyer les anciennes données
+                <span>Clear All Historical Data</span>
+                <span className="text-xs opacity-75">Nettoyer toutes les données historiques</span>
               </button>
             </div>
           </section>

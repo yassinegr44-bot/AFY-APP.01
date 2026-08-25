@@ -33,17 +33,6 @@ export function DeceasedList({ data, onSelectDeceased, onNavigate }: DeceasedLis
     return matchesSearch && matchesFilter;
   });
 
-  const calculateAge = (dob: any, dateOfDeath: any) => {
-    if (!dob) return '—';
-    try {
-      const birth = dob.toDate ? dob.toDate() : new Date(dob);
-      const death = dateOfDeath ? (dateOfDeath.toDate ? dateOfDeath.toDate() : new Date(dateOfDeath)) : new Date();
-      return `${differenceInYears(death, birth)} ans`;
-    } catch (e) {
-      return '—';
-    }
-  };
-
   return (
     <div className="space-y-6 pb-12">
       {/* Header */}
@@ -96,7 +85,6 @@ export function DeceasedList({ data, onSelectDeceased, onNavigate }: DeceasedLis
             <tr className="bg-slate-50/50 dark:bg-slate-950/50 border-b border-slate-100 dark:border-slate-800">
               <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">N° Dossier</th>
               <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Identité du Défunt</th>
-              <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest text-center">Âge</th>
               <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Admission</th>
               <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Heure</th>
               <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Position</th>
@@ -173,11 +161,6 @@ export function DeceasedList({ data, onSelectDeceased, onNavigate }: DeceasedLis
                         </div>
                       </div>
                     </td>
-                    <td className="px-6 py-5 text-center">
-                      <span className="text-sm font-black text-slate-600 dark:text-slate-400">
-                        {calculateAge(record.dob, record.dateOfDeath)}
-                      </span>
-                    </td>
                     <td className="px-6 py-5">
                       <span className="text-sm font-bold text-slate-700 dark:text-slate-300">
                         {format(record.admissionDate.toDate(), 'dd/MM/yyyy')}
@@ -198,7 +181,7 @@ export function DeceasedList({ data, onSelectDeceased, onNavigate }: DeceasedLis
                           "bg-slate-50 dark:bg-slate-800 text-slate-600 dark:text-slate-300 border border-slate-100 dark:border-slate-700"
                         )}>
                           <Refrigerator size={12} />
-                          FRIGO-{record.fridgePosition.toString().padStart(2, '0')}
+                          {record.fridgeNumber === 12 ? `FRIGO-12 (POS-${record.fridgePosition.toString().padStart(2, '0')})` : record.fridgeNumber === 11 ? 'FRIGO-11' : `FRIGO-${(record.fridgeNumber || record.fridgePosition).toString().padStart(2, '0')}`}
                         </div>
                       ) : (
                         <span className="text-xs font-medium text-slate-400 dark:text-slate-500 uppercase">Non renseigné</span>

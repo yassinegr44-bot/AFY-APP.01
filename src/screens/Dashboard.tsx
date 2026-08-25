@@ -47,7 +47,11 @@ export function Dashboard({ data, onNavigate, onSelectDeceased }: DashboardProps
 
   const occupiedCount = fridge.filter((p: any) => p.status === 'occupied').length;
   const availableCount = fridge.filter((p: any) => p.status === 'available').length;
-  const occupancyRate = (occupiedCount / 12) * 100;
+  const occupancyRate = (occupiedCount / 25) * 100;
+
+  const neonatOccupied = fridge.filter((p: any) => p.position >= 1 && p.position <= 15 && p.status === 'occupied').length;
+  const medicoLegalOccupied = fridge.filter((p: any) => p.position >= 16 && p.position <= 25 && p.status === 'occupied').length;
+  const medicoLegalCapacity = 10;
 
   const criticalAlerts = inFacility.filter((d: DeceasedRecord) => {
     const diff = differenceInDays(new Date(), d.admissionDate.toDate());
@@ -294,9 +298,12 @@ export function Dashboard({ data, onNavigate, onSelectDeceased }: DashboardProps
       </section>
 
       {/* Fridge Occupancy Card */}
-      <section className="bg-white dark:bg-slate-900 rounded-xl border border-slate-100 dark:border-slate-800 shadow-sm p-5 transition-colors duration-300">
+      <section 
+        onClick={() => onNavigate('frigo')}
+        className="bg-white dark:bg-slate-900 rounded-xl border border-slate-100 dark:border-slate-800 shadow-sm p-5 transition-colors duration-300 cursor-pointer hover:border-[#006050] group"
+      >
         <div className="flex justify-between items-center mb-4">
-          <h3 className="font-bold text-slate-800 dark:text-slate-100">Occupation des Frigos</h3>
+          <h3 className="font-bold text-slate-800 dark:text-slate-100 group-hover:text-[#006050] transition-colors">Occupation des Frigos</h3>
           <span className="text-xs font-bold text-slate-400">{Math.round(occupancyRate)}%</span>
         </div>
         <div className="w-full bg-slate-100 dark:bg-slate-800 h-3 rounded-full overflow-hidden mb-4">
@@ -313,6 +320,47 @@ export function Dashboard({ data, onNavigate, onSelectDeceased }: DashboardProps
           <div className="flex items-center gap-2">
             <div className="w-2 h-2 bg-slate-200 dark:bg-slate-700 rounded-full" />
             <span className="text-xs font-bold text-slate-600 dark:text-slate-400">{availableCount} Disponibles</span>
+          </div>
+        </div>
+      </section>
+
+      {/* Unit Status Cards */}
+      <section className="grid grid-cols-2 gap-3">
+        <div 
+          onClick={() => onNavigate('frigo')}
+          className="bg-white dark:bg-slate-900 p-4 rounded-xl border border-slate-100 dark:border-slate-800 shadow-sm cursor-pointer hover:border-[#006050] transition-all"
+        >
+          <div className="flex items-center gap-3 mb-2">
+            <div className="w-8 h-8 bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 rounded-lg flex items-center justify-center font-bold">
+              <Refrigerator size={16} />
+            </div>
+            <div>
+              <p className="text-[9px] text-slate-400 font-black uppercase tracking-widest">Frigo 12</p>
+              <h3 className="text-xs font-black text-slate-800 dark:text-slate-100">Unité Néonatale</h3>
+            </div>
+          </div>
+          <div className="flex items-center justify-between mt-2 pt-2 border-t border-slate-50 dark:border-slate-800">
+            <span className="text-[10px] font-bold text-slate-400 uppercase">Occupation</span>
+            <span className="text-xs font-black text-[#006050] dark:text-emerald-400">{neonatOccupied} / 15</span>
+          </div>
+        </div>
+
+        <div 
+          onClick={() => onNavigate('frigo')}
+          className="bg-white dark:bg-slate-900 p-4 rounded-xl border border-slate-100 dark:border-slate-800 shadow-sm cursor-pointer hover:border-[#006050] transition-all"
+        >
+          <div className="flex items-center gap-3 mb-2">
+            <div className="w-8 h-8 bg-emerald-50 dark:bg-emerald-900/30 text-[#006050] dark:text-emerald-400 rounded-lg flex items-center justify-center font-bold">
+              <Refrigerator size={16} />
+            </div>
+            <div>
+              <p className="text-[9px] text-slate-400 font-black uppercase tracking-widest">Frigo 11</p>
+              <h3 className="text-xs font-black text-slate-800 dark:text-slate-100">Unité Médico-Légale</h3>
+            </div>
+          </div>
+          <div className="flex items-center justify-between mt-2 pt-2 border-t border-slate-50 dark:border-slate-800">
+            <span className="text-[10px] font-bold text-slate-400 uppercase">Occupation</span>
+            <span className="text-xs font-black text-[#006050] dark:text-emerald-400">{medicoLegalOccupied} / {medicoLegalCapacity}</span>
           </div>
         </div>
       </section>

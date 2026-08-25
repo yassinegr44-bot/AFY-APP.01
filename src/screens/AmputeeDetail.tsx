@@ -4,7 +4,7 @@ import { ArrowLeft, User, Activity, AlertCircle, Trash2 } from 'lucide-react';
 import { format } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import { formatOperatorName } from '../utils/userUtils';
-import { doc, deleteDoc } from 'firebase/firestore';
+import { doc, deleteDoc, updateDoc } from 'firebase/firestore';
 import { db } from '../lib/firebase';
 
 interface AmputeeDetailProps {
@@ -21,6 +21,12 @@ export function AmputeeDetail({ record, users, onBack }: AmputeeDetailProps) {
     setDeleting(true);
     try {
       await deleteDoc(doc(db, 'amputees', record.id));
+      if (record.fridgePosition) {
+        await updateDoc(doc(db, 'fridge', `pos_${record.fridgePosition}`), {
+          status: 'available',
+          deceasedId: null
+        });
+      }
       alert("Dossier supprimé avec succès.");
       onBack();
     } catch (err: any) {
