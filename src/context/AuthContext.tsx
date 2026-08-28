@@ -32,18 +32,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     let unsubscribeUser: (() => void) | null = null;
 
     const unsubscribeAuth = onAuthStateChanged(auth, async (fUser) => {
-      setFirebaseUser(fUser);
-      
       if (unsubscribeUser) {
         unsubscribeUser();
         unsubscribeUser = null;
       }
 
+      setFirebaseUser(fUser);
+      
       if (fUser) {
         const userRef = doc(db, 'users', fUser.uid);
         
-        // Use onSnapshot for immediate cache access and real-time updates
-        unsubscribeUser = onSnapshot(userRef, (userDoc) => {
+        // Use onSnapshot with includeMetadataChanges: false to handle cache-first correctly
+        // This ensures we get the cached version immediately when offline
+        unsubscribeUser = onSnapshot(userRef, { includeMetadataChanges: true }, (userDoc) => {
           if (userDoc.exists()) {
             const userData = userDoc.data() as AppUser;
             const isConfigured = userData.isNameConfigured === true && !!userData.name && userData.name.trim().length > 0 && userData.name !== 'Utilisateur';
@@ -73,7 +74,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           setLoading(false);
         }, (err) => {
           console.warn("Notice: User document listener error (might be offline):", err);
-          // Fallback if listener fails completely
+          // Fallback if listener fails completely but we have a firebaseUser
           if (!user) {
             setUser({
               id: fUser.uid,
@@ -82,10 +83,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
               name: fUser.displayName || 'Opérateur',
               isNameConfigured: true
             });
-            setLoading(false);
           }
+          setLoading(false);
         });
       } else {
+        // If fUser is null, we are definitely logged out
         setUser(null);
         setShowNameModal(false);
         setLoading(false);
