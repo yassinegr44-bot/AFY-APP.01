@@ -1,5 +1,12 @@
-import React, { useState } from 'react';
-import { signInWithPopup, GoogleAuthProvider, signInWithEmailAndPassword, createUserWithEmailAndPassword } from 'firebase/auth';
+import React, { useState, useEffect } from 'react';
+import { 
+  signInWithPopup, 
+  GoogleAuthProvider, 
+  signInWithEmailAndPassword, 
+  createUserWithEmailAndPassword,
+  signInWithRedirect,
+  getRedirectResult
+} from 'firebase/auth';
 import { doc, setDoc, getDoc } from 'firebase/firestore';
 import { auth, db } from '../lib/firebase';
 import { motion } from 'motion/react';
@@ -12,34 +19,74 @@ export function Login() {
   const [password, setPassword] = useState('');
   const [isRegistering, setIsRegistering] = useState(false);
 
+  // Check for redirect result on mount (essential for PWA redirect flow)
+  useEffect(() => {
+    const checkRedirect = async () => {
+      try {
+        const result = await getRedirectResult(auth);
+        if (result) {
+          const user = result.user;
+          const userRef = doc(db, 'users', user.uid);
+          const userSnap = await getDoc(userRef);
+
+          if (!userSnap.exists()) {
+            await setDoc(userRef, {
+              name: user.displayName || 'Utilisateur',
+              email: user.email,
+              role: 'agent',
+              createdAt: new Date()
+            });
+          }
+        }
+      } catch (err: any) {
+        console.error("Redirect Error:", err);
+        setError('Erreur lors de la redirection Google.');
+      }
+    };
+    checkRedirect();
+  }, []);
+
   const handleGoogleSignIn = async () => {
     setLoading(true);
     setError('');
     try {
       const provider = new GoogleAuthProvider();
-      const result = await signInWithPopup(auth, provider);
-      const user = result.user;
+      
+      // Detect if app is running in standalone mode (PWA installed)
+      const isStandalone = window.matchMedia('(display-mode: standalone)').matches || (window.navigator as any).standalone;
 
-      const userRef = doc(db, 'users', user.uid);
-      const userSnap = await getDoc(userRef);
+      if (isStandalone) {
+        // Use redirect for PWA standalone as popups are often blocked or unstable
+        await signInWithRedirect(auth, provider);
+      } else {
+        // Use popup for normal browser mode
+        const result = await signInWithPopup(auth, provider);
+        const user = result.user;
 
-      if (!userSnap.exists()) {
-        await setDoc(userRef, {
-          name: user.displayName || 'Utilisateur',
-          email: user.email,
-          role: 'agent',
-          createdAt: new Date()
-        });
+        const userRef = doc(db, 'users', user.uid);
+        const userSnap = await getDoc(userRef);
+
+        if (!userSnap.exists()) {
+          await setDoc(userRef, {
+            name: user.displayName || 'Utilisateur',
+            email: user.email,
+            role: 'agent',
+            createdAt: new Date()
+          });
+        }
       }
     } catch (err: any) {
       if (err.code === 'auth/popup-closed-by-user' || err.code === 'auth/cancelled-popup-request') {
         setError('');
       } else {
-        console.error(err);
+        console.error("DEBUG - Google Sign-In Error:", err);
         setError('Erreur lors de la connexion Google.');
       }
     } finally {
-      setLoading(false);
+      // In case of redirect, loading state will be lost on page reload, which is expected
+      if (!(window.matchMedia('(display-mode: standalone)').matches || (window.navigator as any).standalone)) {
+        setLoading(false);
+      }
     }
   };
 

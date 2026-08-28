@@ -1,5 +1,5 @@
 import { initializeApp } from 'firebase/app';
-import { initializeAuth, browserLocalPersistence } from 'firebase/auth';
+import { getAuth } from 'firebase/auth';
 import { 
   initializeFirestore, 
   getFirestore,
@@ -11,10 +11,8 @@ import firebaseConfig from '../../firebase-applet-config.json';
 
 const app = initializeApp(firebaseConfig);
 
-// Initialize Auth with explicit persistence to ensure offline session restoration
-export const auth = initializeAuth(app, {
-  persistence: browserLocalPersistence,
-});
+// Standard auth initialization (uses browserLocalPersistence by default)
+export const auth = getAuth(app);
 
 const dbId = (firebaseConfig as any).firestoreDatabaseId || '(default)';
 
