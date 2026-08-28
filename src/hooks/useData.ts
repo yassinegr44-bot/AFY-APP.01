@@ -7,6 +7,8 @@ import {
   doc, 
   addDoc, 
   updateDoc, 
+  deleteDoc,
+  writeBatch,
   setDoc, 
   Timestamp, 
   serverTimestamp,
@@ -173,8 +175,8 @@ export function useData(currentUser: AppUser | null | undefined) {
     let fridgeDocId = '';
     let fridgeNum = 1;
 
-    const fridgeSnapshot = await getDocs(collection(db, 'fridge'));
-    const fridgePositions = fridgeSnapshot.docs.map(d => ({ id: d.id, ...d.data() } as any));
+    // Use local fridge state instead of getDocs for offline-first
+    const fridgePositions = fridge;
 
     if (finalCaseType === 'FŒTUS' || finalCaseType === 'MORT_NÉ' || finalCaseType === 'ENFANT_MOINS_1_AN') {
       const neonatPositions = fridgePositions
@@ -210,16 +212,6 @@ export function useData(currentUser: AppUser | null | undefined) {
       fridgeNum = Number(fridgePos);
     }
 
-    const q = query(
-      collection(db, 'deceased'),
-      where('createdAt', '>=', Timestamp.fromDate(new Date(currentYear, 0, 1))),
-      orderBy('createdAt', 'desc')
-    );
-    const snapshot = await getDocs(q);
-    const nonHistoricalDocs = snapshot.docs.filter(doc => !doc.data().isHistorical);
-    const count = nonHistoricalDocs.length + 1;
-    const refNumber = `AFY ${currentYear} ${count.toString().padStart(4, '0')}`;
-
     const operatorIdentity = getActiveOperatorIdentity();
     const operatorUid = currentUser?.id || '';
     const operatorRole = currentUser?.role || 'staff';
@@ -230,7 +222,8 @@ export function useData(currentUser: AppUser | null | undefined) {
       caseType: finalCaseType,
       fridgePosition: fridgePos,
       fridgeNumber: fridgeNum,
-      refNumber,
+      // refNumber will be assigned by the server
+      syncStatus: 'pending',
       status: 'in_facility',
       createdBy: operatorIdentity,
       createdByUid: operatorUid,
@@ -241,7 +234,7 @@ export function useData(currentUser: AppUser | null | undefined) {
         type: 'admission',
         title: 'Admission au centre',
         description: `Entrée enregistrée (${finalCaseType}) à la position Frigo ${fridgeNum === 12 ? '12 (Unité Néonatale)' : fridgeNum === 11 ? '11 (Unité Médico-Légale)' : fridgeNum} — Position ${fridgePos.toString().padStart(2, '0')}`,
-        timestamp: serverTimestamp(),
+        timestamp: Timestamp.now(),
         createdBy: operatorIdentity,
         operatorUid,
         operatorRole,
@@ -263,9 +256,8 @@ export function useData(currentUser: AppUser | null | undefined) {
   };
 
   const registerAmputee = async (data: Omit<AmputeeRecord, 'id' | 'refNumber' | 'createdAt'>) => {
-    const currentYear = new Date().getFullYear();
-    const fridgeSnapshot = await getDocs(collection(db, 'fridge'));
-    const fridgePositions = fridgeSnapshot.docs.map(d => ({ id: d.id, ...d.data() } as any));
+    // Use local fridge state instead of getDocs
+    const fridgePositions = fridge;
     const medicoLegalPositions = fridgePositions
       .filter(p => p.fridgeNumber === 11 && p.status === 'available')
       .sort((a, b) => a.position - b.position);
@@ -276,22 +268,15 @@ export function useData(currentUser: AppUser | null | undefined) {
     const fridgePos = medicoLegalPositions[0].position;
     const fridgeDocId = medicoLegalPositions[0].id;
 
-    const q = query(
-      collection(db, 'amputees'),
-      where('createdAt', '>=', Timestamp.fromDate(new Date(currentYear, 0, 1))),
-      orderBy('createdAt', 'desc')
-    );
-    const snapshot = await getDocs(q);
-    const count = snapshot.size + 1;
-    const refNumber = `AMP-${currentYear}-${count.toString().padStart(4, '0')}`;
-
     const operatorIdentity = getActiveOperatorIdentity();
 
     const record = {
       ...data,
-      refNumber,
+      // refNumber will be assigned by the server
+      syncStatus: 'pending',
       fridgePosition: fridgePos,
       fridgeNumber: 11,
+      status: 'in_facility',
       createdBy: operatorIdentity,
       createdByUid: currentUser?.id || '',
       createdByRole: currentUser?.role || 'staff',
@@ -310,6 +295,59 @@ export function useData(currentUser: AppUser | null | undefined) {
     return docRef.id;
   };
 
+  const getFridgeDocId = (fridgeNumber: number, fridgePosition: number) => {
+    if (fridgeNumber === 12) return `pos_12_${fridgePosition}`;
+    if (fridgeNumber === 11) return `pos_11_${fridgePosition}`;
+    if (fridgeNumber >= 1 && fridgeNumber <= 10) return `pos_${fridgeNumber}`;
+    return null;
+  };
+
+  const deleteDeceasedRecord = async (id: string) => {
+    const record = deceased.find(d => d.id === id);
+    if (!record) return;
+
+    const batch = writeBatch(db);
+
+    // 1. Delete deceased document
+    batch.delete(doc(db, 'deceased', id));
+
+    // 2. Free up fridge if record was in facility
+    if (record.status === 'in_facility' && record.fridgeNumber && record.fridgePosition) {
+      const fridgeId = getFridgeDocId(record.fridgeNumber, record.fridgePosition);
+      if (fridgeId) {
+        batch.update(doc(db, 'fridge', fridgeId), {
+          status: 'available',
+          deceasedId: null
+        });
+      }
+    }
+
+    await batch.commit();
+  };
+
+  const deleteAmputeeRecord = async (id: string) => {
+    const record = amputees.find(a => a.id === id);
+    if (!record) return;
+
+    const batch = writeBatch(db);
+
+    // 1. Delete amputee document
+    batch.delete(doc(db, 'amputees', id));
+
+    // 2. Free up fridge (amputees are always in Frigo 11 if active)
+    if (record.status === 'in_facility' && record.fridgeNumber && record.fridgePosition) {
+      const fridgeId = getFridgeDocId(record.fridgeNumber, record.fridgePosition);
+      if (fridgeId) {
+        batch.update(doc(db, 'fridge', fridgeId), {
+          status: 'available',
+          deceasedId: null
+        });
+      }
+    }
+
+    await batch.commit();
+  };
+
   const registerExit = async (id: string, exitData: any) => {
     const recordRef = doc(db, 'deceased', id);
     const deceasedRecord = deceased.find(d => d.id === id);
@@ -325,7 +363,7 @@ export function useData(currentUser: AppUser | null | undefined) {
       type: 'exit',
       title: 'Sortie du centre',
       description: `Le corps a été libéré.${exitData.exitNotes ? ` (${exitData.exitNotes})` : ''}`,
-      timestamp: serverTimestamp(),
+      timestamp: Timestamp.now(),
       createdBy: operatorIdentity,
       operatorUid,
       operatorRole,
@@ -360,16 +398,13 @@ export function useData(currentUser: AppUser | null | undefined) {
 
     // Free up fridge
     if (deceasedRecord?.fridgePosition && deceasedRecord?.fridgeNumber) {
-      const fridgeId = deceasedRecord.fridgeNumber === 12 
-        ? `pos_12_${deceasedRecord.fridgePosition}` 
-        : deceasedRecord.fridgeNumber === 11
-          ? `pos_11_${deceasedRecord.fridgePosition}`
-          : `pos_${deceasedRecord.fridgeNumber}`;
-      
-      await updateDoc(doc(db, 'fridge', fridgeId), {
-        status: 'available',
-        deceasedId: null
-      });
+      const fridgeId = getFridgeDocId(deceasedRecord.fridgeNumber, deceasedRecord.fridgePosition);
+      if (fridgeId) {
+        await updateDoc(doc(db, 'fridge', fridgeId), {
+          status: 'available',
+          deceasedId: null
+        });
+      }
     }
   };
 
@@ -382,7 +417,7 @@ export function useData(currentUser: AppUser | null | undefined) {
         type: 'note' as const,
         title: 'Mise à jour de l\'identité',
         description: `L'identité a été mise à jour par l'opérateur.`,
-        timestamp: serverTimestamp(),
+        timestamp: Timestamp.now(),
         createdBy: 'Opérateur',
       };
 
@@ -426,6 +461,27 @@ export function useData(currentUser: AppUser | null | undefined) {
     return docRef.id;
   };
 
+  const cleanupAllHistoricalData = async () => {
+    const [snapshotDeceased, snapshotAmputees, snapshotFridge] = await Promise.all([
+      getDocs(collection(db, 'deceased')),
+      getDocs(collection(db, 'amputees')),
+      getDocs(collection(db, 'fridge'))
+    ]);
+
+    const deletePromises = [
+      ...snapshotDeceased.docs.map(doc => deleteDoc(doc.ref)),
+      ...snapshotAmputees.docs.map(doc => deleteDoc(doc.ref))
+    ];
+
+    const resetFridgePromises = snapshotFridge.docs.map(doc => updateDoc(doc.ref, {
+      status: 'available',
+      deceasedId: null
+    }));
+
+    await Promise.all([...deletePromises, ...resetFridgePromises]);
+    return deletePromises.length;
+  };
+
   return { 
     deceased: deceased || [], 
     historicalDeceased: historicalDeceased || [], 
@@ -438,6 +494,9 @@ export function useData(currentUser: AppUser | null | undefined) {
     registerHistoricalDeceased, 
     registerAmputee, 
     registerExit, 
-    updateDeceasedIdentity 
+    updateDeceasedIdentity,
+    deleteDeceasedRecord,
+    deleteAmputeeRecord,
+    cleanupAllHistoricalData
   };
 }

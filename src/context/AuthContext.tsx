@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { onAuthStateChanged, User, updateProfile } from 'firebase/auth';
-import { doc, getDoc, setDoc, updateDoc } from 'firebase/firestore';
+import { doc, onSnapshot, setDoc, updateDoc } from 'firebase/firestore';
 import { auth, db } from '../lib/firebase';
 import { AppUser } from '../types';
 
@@ -29,13 +29,21 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [showNameModal, setShowNameModal] = useState(false);
 
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, async (fUser) => {
-      setFirebaseUser(fUser);
-      if (fUser) {
-        try {
-          const userRef = doc(db, 'users', fUser.uid);
-          const userDoc = await getDoc(userRef);
+    let unsubscribeUser: (() => void) | null = null;
 
+    const unsubscribeAuth = onAuthStateChanged(auth, async (fUser) => {
+      setFirebaseUser(fUser);
+      
+      if (unsubscribeUser) {
+        unsubscribeUser();
+        unsubscribeUser = null;
+      }
+
+      if (fUser) {
+        const userRef = doc(db, 'users', fUser.uid);
+        
+        // Use onSnapshot for immediate cache access and real-time updates
+        unsubscribeUser = onSnapshot(userRef, (userDoc) => {
           if (userDoc.exists()) {
             const userData = userDoc.data() as AppUser;
             const isConfigured = userData.isNameConfigured === true && !!userData.name && userData.name.trim().length > 0 && userData.name !== 'Utilisateur';
@@ -55,30 +63,39 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
               name: '',
               isNameConfigured: false
             };
-            await setDoc(userRef, { ...newUserDoc, createdAt: new Date() });
+            // On ne bloque pas sur le setDoc pour le offline
+            setDoc(userRef, { ...newUserDoc, createdAt: new Date() }).catch(err => {
+              console.warn("Notice: setDoc for new user failed or queued offline:", err);
+            });
             setUser({ id: fUser.uid, ...newUserDoc } as AppUser);
-            
-            // Obliger la saisie du nom officiel AFY
             setShowNameModal(true);
           }
-        } catch (err) {
-          console.warn("Notice: Auth user document retrieval offline or retryable:", err);
-          setUser({
-            id: fUser.uid,
-            email: fUser.email || '',
-            role: 'staff',
-            name: fUser.displayName || 'Opérateur',
-            isNameConfigured: true
-          });
-        }
+          setLoading(false);
+        }, (err) => {
+          console.warn("Notice: User document listener error (might be offline):", err);
+          // Fallback if listener fails completely
+          if (!user) {
+            setUser({
+              id: fUser.uid,
+              email: fUser.email || '',
+              role: 'staff',
+              name: fUser.displayName || 'Opérateur',
+              isNameConfigured: true
+            });
+            setLoading(false);
+          }
+        });
       } else {
         setUser(null);
         setShowNameModal(false);
+        setLoading(false);
       }
-      setLoading(false);
     });
 
-    return () => unsubscribe();
+    return () => {
+      unsubscribeAuth();
+      if (unsubscribeUser) unsubscribeUser();
+    };
   }, []);
 
   const updateUserName = async (newName: string) => {

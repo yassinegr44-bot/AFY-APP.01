@@ -80,6 +80,83 @@ app.post("/api/admin/delete-user", async (req, res) => {
   }
 });
 
+// --- AUTOMATIC REFERENCE ATTRIBUTION ENGINE ---
+const setupAttributionEngine = () => {
+  const db = getAdminFirestore();
+  if (!db) {
+    console.error("[Sync Engine] Firestore Admin not available");
+    return;
+  }
+
+  const assignRefNumber = async (docId: string, collectionName: 'deceased' | 'amputees') => {
+    const docRef = db.collection(collectionName).doc(docId);
+    
+    try {
+      await db.runTransaction(async (transaction) => {
+        const docSnap = await transaction.get(docRef);
+        if (!docSnap.exists) return;
+        
+        const data = docSnap.data();
+        // IDEMPOTENCE: Only assign if syncStatus is 'pending' and refNumber is missing
+        if (data?.syncStatus !== 'pending' || data?.refNumber) return;
+
+        const createdAt = data?.createdAt?.toDate() || new Date();
+        const year = createdAt.getFullYear();
+        const counterId = `${collectionName}_${year}`;
+        const counterRef = db.collection('settings').doc('counters').collection('years').doc(counterId);
+        
+        const counterSnap = await transaction.get(counterRef);
+        const nextNumber = (counterSnap.data()?.lastNumber || 0) + 1;
+
+        const prefix = collectionName === 'amputees' ? 'AMP' : 'AFY';
+        // Format: "AFY 2026 0001" or "AMP-2026-0001"
+        const formattedRef = collectionName === 'amputees' 
+          ? `${prefix}-${year}-${nextNumber.toString().padStart(4, '0')}`
+          : `${prefix} ${year} ${nextNumber.toString().padStart(4, '0')}`;
+
+        // Atomic Transaction Update
+        transaction.set(counterRef, { lastNumber: nextNumber }, { merge: true });
+        transaction.update(docRef, {
+          refNumber: formattedRef,
+          syncStatus: 'synced',
+          updatedAt: (admin as any).firestore.FieldValue.serverTimestamp()
+        });
+        
+        console.log(`[Sync Engine] Assigned ${formattedRef} to ${collectionName}/${docId}`);
+      });
+    } catch (error) {
+      console.error(`[Sync Engine Error] Failed to assign ref to ${collectionName}/${docId}:`, error);
+    }
+  };
+
+  // Listen for pending deceased records
+  db.collection('deceased')
+    .where('syncStatus', '==', 'pending')
+    .onSnapshot(snapshot => {
+      snapshot.docChanges().forEach(change => {
+        if (change.type === 'added' || change.type === 'modified') {
+          assignRefNumber(change.doc.id, 'deceased');
+        }
+      });
+    }, err => console.error("[Sync Engine] Deceased listener error:", err));
+
+  // Listen for pending amputee records
+  db.collection('amputees')
+    .where('syncStatus', '==', 'pending')
+    .onSnapshot(snapshot => {
+      snapshot.docChanges().forEach(change => {
+        if (change.type === 'added' || change.type === 'modified') {
+          assignRefNumber(change.doc.id, 'amputees');
+        }
+      });
+    }, err => console.error("[Sync Engine] Amputees listener error:", err));
+    
+  console.log("[Sync Engine] Automatic attribution engine started");
+};
+
+// Start the engine
+setupAttributionEngine();
+
 app.get("/api/health", (req, res) => {
   res.json({ status: "ok" });
 });

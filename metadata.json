@@ -1,6 +1,6 @@
 {
-  "name": "AFY",
-  "description": "Professional deceased record management and morgue operation system with real-time tracking, fridge synchronization, and institutional reporting.",
+  "name": "AFY — Assistance Funéraire",
+  "description": "Système professionnel de gestion hospitalière et funéraire avec synchronisation en temps réel et support hors ligne.",
   "requestFramePermissions": [],
   "majorCapabilities": [
     "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"

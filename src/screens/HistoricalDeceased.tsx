@@ -18,7 +18,7 @@ import {
   Trash2
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
-import { Timestamp, doc, deleteDoc, updateDoc, serverTimestamp } from 'firebase/firestore';
+import { Timestamp, doc, updateDoc, serverTimestamp } from 'firebase/firestore';
 import { db } from '../lib/firebase';
 import { DeceasedRecord } from '../types';
 import { cn } from '../lib/utils';
@@ -301,7 +301,7 @@ export function HistoricalDeceased({ data, onNavigate }: HistoricalDeceasedProps
   const handleDelete = async (id: string) => {
     if (confirm("Êtes-vous sûr de vouloir supprimer définitivement ce dossier historique ? Cette action est irréversible.")) {
       try {
-        await deleteDoc(doc(db, 'deceased', id));
+        await data.deleteDeceasedRecord(id);
         setViewState('list');
         setSelectedRecord(null);
       } catch (err) {

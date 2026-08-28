@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Settings as SettingsIcon, Bell, Shield, LogOut, Save, ChevronRight, User, Menu, MoreVertical, BadgeCheck, Moon, Sun, CheckCircle } from 'lucide-react';
-import { doc, updateDoc, collection, query, getDocs, deleteDoc, Timestamp, where } from 'firebase/firestore';
+import { doc, updateDoc, collection, query, getDocs, deleteDoc } from 'firebase/firestore';
 import { db, auth } from '../lib/firebase';
 import { motion } from 'motion/react';
 import { signOut } from 'firebase/auth';
@@ -14,9 +14,10 @@ interface SettingsProps {
   data: any;
   onNavigate: (screen: string) => void;
   onOpenProfile?: () => void;
+  onCleanupAll?: () => Promise<number>;
 }
 
-export function Settings({ data, onNavigate, onOpenProfile }: SettingsProps) {
+export function Settings({ data, onNavigate, onOpenProfile, onCleanupAll }: SettingsProps) {
   const { settings } = data;
   const { user } = useAuth();
   const { theme, toggleTheme } = useTheme();
@@ -97,19 +98,14 @@ export function Settings({ data, onNavigate, onOpenProfile }: SettingsProps) {
   };
 
   const handleCleanupConfirm = async () => {
-    const [snapshotDeceased, snapshotAmputees] = await Promise.all([
-      getDocs(collection(db, 'deceased')),
-      getDocs(collection(db, 'amputees'))
-    ]);
-
-    const deletePromises = [
-      ...snapshotDeceased.docs.map(doc => deleteDoc(doc.ref)),
-      ...snapshotAmputees.docs.map(doc => deleteDoc(doc.ref))
-    ];
-
-    await Promise.all(deletePromises);
-    const totalCount = deletePromises.length;
-    alert(`${totalCount} enregistrements historiques (décès et amputés) ont été supprimés avec succès.`);
+    if (!onCleanupAll) return;
+    try {
+      const count = await onCleanupAll();
+      alert(`${count} enregistrements historiques (décès et amputés) ont été supprimés avec succès et les frigos ont été libérés.`);
+    } catch (err) {
+      console.error(err);
+      alert("Erreur lors du nettoyage des données.");
+    }
   };
 
   return (

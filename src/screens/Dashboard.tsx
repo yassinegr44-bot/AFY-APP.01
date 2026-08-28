@@ -409,24 +409,32 @@ export function Dashboard({ data, onNavigate, onSelectDeceased }: DashboardProps
             </div>
           ) : (
             <div className="divide-y divide-slate-50 dark:divide-slate-800">
-              {recentActivity.map((record) => (
-                <div key={record.id} className="p-4 flex items-start gap-4">
-                  <div className="bg-emerald-50 dark:bg-emerald-900/20 text-emerald-600 dark:text-emerald-400 p-2.5 rounded-xl">
-                    <LogIn size={20} />
-                  </div>
-                  <div>
-                    <div className="flex items-center gap-2 mb-0.5">
-                      <p className="text-sm font-bold text-slate-800 dark:text-slate-100">Admission : Dossier #{record.refNumber}</p>
-                      <span className="text-[10px] text-slate-400 font-medium">
-                        {formatDistanceToNow(record.admissionDate.toDate(), { addSuffix: true, locale: fr })}
-                      </span>
+              {recentActivity.map((record) => {
+                const isPending = record.syncStatus === 'pending' || !record.refNumber;
+                return (
+                  <div key={record.id} className="p-4 flex items-start gap-4">
+                    <div className="bg-emerald-50 dark:bg-emerald-900/20 text-emerald-600 dark:text-emerald-400 p-2.5 rounded-xl">
+                      <LogIn size={20} />
                     </div>
-                    <p className="text-xs text-slate-500 dark:text-slate-400 font-medium">
-                      {record.name} - Affecté au Frigo {record.fridgePosition}
-                    </p>
+                    <div>
+                      <div className="flex items-center gap-2 mb-0.5">
+                        <p className={cn(
+                          "text-sm font-bold",
+                          isPending ? "text-blue-500 italic" : "text-slate-800 dark:text-slate-100"
+                        )}>
+                          {isPending ? 'Admission en attente de synchro' : `Admission : Dossier #${record.refNumber}`}
+                        </p>
+                        <span className="text-[10px] text-slate-400 font-medium">
+                          {formatDistanceToNow(record.admissionDate.toDate(), { addSuffix: true, locale: fr })}
+                        </span>
+                      </div>
+                      <p className="text-xs text-slate-500 dark:text-slate-400 font-medium">
+                        {record.name} - Affecté au Frigo {record.fridgePosition}
+                      </p>
+                    </div>
                   </div>
-                </div>
-              ))}
+                );
+              })}
               <button 
                 onClick={() => onNavigate('deceased')}
                 className="w-full py-3 text-xs font-bold text-slate-500 hover:bg-slate-50 dark:hover:bg-slate-950 transition-colors border-t border-slate-50 dark:border-slate-800"

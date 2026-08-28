@@ -38,7 +38,8 @@ export interface Report {
 
 export interface AmputeeRecord {
   id: string;
-  refNumber: string;
+  refNumber?: string;
+  syncStatus?: 'pending' | 'synced';
   name: string;
   firstName: string;
   dob?: Timestamp;
@@ -67,7 +68,8 @@ export type CaseType = 'DÉCÈS' | 'FŒTUS' | 'MORT_NÉ' | 'ENFANT_MOINS_1_AN' |
 
 export interface DeceasedRecord {
   id: string;
-  refNumber: string;
+  refNumber?: string;
+  syncStatus?: 'pending' | 'synced';
   name: string;
   cin?: string;
   gender: 'Masculin' | 'Féminin' | 'Autre';

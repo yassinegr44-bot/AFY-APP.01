@@ -18,7 +18,8 @@ import {
   History,
   ArrowRight,
   Plus,
-  Download
+  Download,
+  Trash2
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { formatDate } from '../lib/utils';
@@ -36,13 +37,15 @@ interface DeceasedDetailProps {
   onBack: () => void;
   onExit: (data: any) => Promise<void>;
   onUpdateIdentity?: (data: Partial<DeceasedRecord>) => Promise<void>;
+  onDelete?: () => Promise<void>;
 }
 
-export function DeceasedDetail({ record, users, onBack, onExit, onUpdateIdentity }: DeceasedDetailProps) {
+export function DeceasedDetail({ record, users, onBack, onExit, onUpdateIdentity, onDelete }: DeceasedDetailProps) {
   const { user: currentUser } = useAuth();
   const activeOperatorName = currentUser?.name || 'Opérateur';
   const [showExitForm, setShowExitForm] = useState(false);
   const [showIdentityForm, setShowIdentityForm] = useState(false);
+  const [deleting, setDeleting] = useState(false);
   const [identityData, setIdentityData] = useState({
     cin: record.cin || "",
     name: '',
@@ -52,6 +55,23 @@ export function DeceasedDetail({ record, users, onBack, onExit, onUpdateIdentity
     origin: record.origin || 'Marocain',
     originDetail: record.originDetail || ''
   });
+
+  const handleDelete = async () => {
+    if (!window.confirm("⚠️ Attention : Cette action supprimera définitivement ce dossier et libérera sa position en morgue. Êtes-vous sûr ?")) return;
+    if (!onDelete) return;
+
+    setDeleting(true);
+    try {
+      await onDelete();
+      alert("Dossier supprimé avec succès.");
+      onBack();
+    } catch (err: any) {
+      console.error(err);
+      alert("Erreur lors de la suppression : " + err.message);
+    } finally {
+      setDeleting(false);
+    }
+  };
   const [exitData, setExitData] = useState({
     exitDate: new Date().toISOString().split('T')[0],
     exitTime: new Date().toTimeString().slice(0, 5),
@@ -120,6 +140,7 @@ export function DeceasedDetail({ record, users, onBack, onExit, onUpdateIdentity
   };
 
   const isReleased = record.status === 'released';
+  const isPending = record.syncStatus === 'pending' || !record.refNumber;
   const admissionDate = record.admissionDate.toDate();
   const exitDate = isReleased && record.exitDate ? record.exitDate.toDate() : new Date();
   const diff = differenceInDays(exitDate, admissionDate);
@@ -132,6 +153,23 @@ export function DeceasedDetail({ record, users, onBack, onExit, onUpdateIdentity
 
   return (
     <div className="space-y-6 pb-20">
+      {/* Pending Sync Banner */}
+      {isPending && (
+        <motion.div 
+          initial={{ opacity: 0, y: -20 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="bg-blue-50 dark:bg-blue-900/20 border border-blue-100 dark:border-blue-900/30 p-4 rounded-2xl flex items-center gap-4"
+        >
+          <div className="w-10 h-10 bg-blue-100 dark:bg-blue-900/40 rounded-full flex items-center justify-center text-blue-600 dark:text-blue-400 shrink-0">
+            <Activity size={20} className="animate-pulse" />
+          </div>
+          <div>
+            <p className="text-xs font-black text-blue-800 dark:text-blue-300 uppercase tracking-tight">Synchronisation en cours...</p>
+            <p className="text-[10px] font-medium text-blue-600 dark:text-blue-400">Le numéro de référence officiel sera attribué dès la reconnexion au serveur.</p>
+          </div>
+        </motion.div>
+      )}
+
       {/* Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
@@ -147,7 +185,12 @@ export function DeceasedDetail({ record, users, onBack, onExit, onUpdateIdentity
               )}>
                 {!isReleased ? (isUrgent ? 'URGENT' : isApproaching ? 'APPROCHE' : 'ACTIF') : 'LIBÉRÉ'}
               </span>
-              <span className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">#{record.refNumber}</span>
+              <span className={cn(
+                "text-[10px] font-bold uppercase tracking-widest",
+                isPending ? "text-blue-500 italic" : "text-slate-400"
+              )}>
+                {isPending ? 'En attente de synchronisation' : `#${record.refNumber}`}
+              </span>
             </div>
           </div>
         </div>
@@ -161,13 +204,28 @@ export function DeceasedDetail({ record, users, onBack, onExit, onUpdateIdentity
               <span className="hidden sm:inline">Mettre à jour l'identité</span>
             </button>
           )}
+          {currentUser?.role === 'admin' && (
+            <button 
+              onClick={handleDelete}
+              disabled={deleting}
+              className="bg-red-50 hover:bg-red-100 text-red-600 dark:bg-red-900/30 dark:hover:bg-red-900/50 dark:text-red-400 p-2 rounded-xl shadow-sm transition-all border border-red-200 dark:border-red-900/50 disabled:opacity-50"
+              title="Supprimer définitivement"
+            >
+              <Trash2 size={18} />
+            </button>
+          )}
           <button 
             onClick={() => generateSingleDossierPDF(record, users)}
-            className="bg-[#006050] hover:bg-[#004d40] text-white px-3.5 py-2 rounded-xl text-xs font-black flex items-center gap-1.5 shadow-sm transition-all"
-            title="Télécharger ce dossier en PDF"
+            className={cn(
+              "px-3.5 py-2 rounded-xl text-xs font-black flex items-center gap-1.5 shadow-sm transition-all",
+              isPending 
+                ? "bg-slate-100 dark:bg-slate-800 text-slate-400 border border-slate-200 dark:border-slate-700" 
+                : "bg-[#006050] hover:bg-[#004d40] text-white"
+            )}
+            title={isPending ? "Télécharger un document provisoire" : "Télécharger ce dossier en PDF"}
           >
             <Download size={15} />
-            <span className="hidden sm:inline">Exporter PDF</span>
+            <span className="hidden sm:inline">{isPending ? 'Exporter Provisoire' : 'Exporter PDF'}</span>
           </button>
         </div>
       </div>
@@ -260,7 +318,7 @@ export function DeceasedDetail({ record, users, onBack, onExit, onUpdateIdentity
         <DetailSection title="Informations Personnelles" icon={User}>
           <DetailRow label="Nom complet" value={record.name || '—'} />
           <DetailRow label="Sexe / Genre" value={record.gender === 'Masculin' ? 'Masculin' : record.gender === 'Féminin' ? 'Féminin' : `Autre (${record.otherGender || ''})`} />
-          <DetailRow label="Référence Unique" value={record.refNumber} highlight />
+          <DetailRow label="Référence Unique" value={record.refNumber || 'En attente...'} highlight={!isPending} />
           <DetailRow label="Opérateur de l'entrée" value={formatOperatorName(record.createdBy, users, activeOperatorName)} />
           {isReleased && (
             <DetailRow label="Opérateur de la sortie" value={formatOperatorName((record as any).releasedByOperator || record.timeline?.find(e => e.type === 'exit')?.createdBy, users, activeOperatorName)} highlight />

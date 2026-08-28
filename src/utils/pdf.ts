@@ -323,7 +323,7 @@ export const generateStatisticsPDF = async (data: any) => {
     }
     
     return [
-      `#${d.refNumber || 'N/A'}`,
+      d.refNumber ? `#${d.refNumber}` : 'En attente...',
       d.cin || '—',
       d.name || 'Identité Inconnue',
       d.admissionDate ? format(d.admissionDate.toDate(), 'dd/MM/yyyy') : '—',
@@ -405,7 +405,7 @@ export const generateDossiersPDF = async (records: DeceasedRecord[], users?: App
   const tocData = safeRecords.map((r, idx) => {
     const targetPage = idx + 2;
     return [
-      `#${r.refNumber || 'N/A'}`,
+      r.refNumber ? `#${r.refNumber}` : 'En attente...',
       r.name || 'Identité Inconnue',
       r.status === 'released' ? 'SORTI / LIBÉRÉ' : 'PRÉSENT',
       r.admissionDate ? format(r.admissionDate.toDate(), 'dd/MM/yyyy') : '—',
@@ -460,17 +460,29 @@ export const generateDossiersPDF = async (records: DeceasedRecord[], users?: App
     const headerBgColor: [number, number, number] = isReleased ? [16, 120, 100] : COLOR_PRIMARY;
 
     // Entête du dossier
+    const isPending = record.syncStatus === 'pending' || !record.refNumber;
     doc.setFillColor(...headerBgColor);
     doc.roundedRect(14, currentY, pageWidth - 28, 22, 2, 2, 'F');
 
     doc.setTextColor(...COLOR_WHITE);
     doc.setFont('helvetica', 'bold');
     doc.setFontSize(13);
-    doc.text(`DOSSIER DE DÉCÈS #${record.refNumber || 'N/A'}`, 20, currentY + 9);
+    doc.text(`DOSSIER DE DÉCÈS #${record.refNumber || 'EN ATTENTE'}`, 20, currentY + 9);
 
     doc.setFontSize(8.5);
     doc.setFont('helvetica', 'normal');
-    doc.text(`Dossier ${index + 1} sur ${safeRecords.length} | AFY Système Hospitalier`, 20, currentY + 16);
+    doc.text(isPending ? "DOCUMENT PROVISOIRE - EN ATTENTE DE SYNCHRONISATION" : `Dossier ${index + 1} sur ${safeRecords.length} | AFY Système Hospitalier`, 20, currentY + 16);
+
+    // Add watermark for pending documents
+    if (isPending) {
+      doc.saveGraphicsState();
+      doc.setGState(new (doc as any).GState({ opacity: 0.1 }));
+      doc.setFontSize(60);
+      doc.setFont('helvetica', 'bold');
+      doc.setTextColor(200, 0, 0);
+      doc.text("PROVISOIRE", pageWidth / 2, pageHeight / 2, { align: 'center', angle: 45 });
+      doc.restoreGraphicsState();
+    }
 
     // Bouton Cliquable de retour au Sommaire / Recherche en haut à droite
     doc.setFillColor(...COLOR_WHITE);
@@ -527,7 +539,7 @@ export const generateDossiersPDF = async (records: DeceasedRecord[], users?: App
         ],
         [
           { content: 'Référence :', styles: { fontStyle: 'bold', textColor: COLOR_DARK_TEXT } },
-          { content: `#${record.refNumber}`, styles: { fontStyle: 'bold', textColor: COLOR_PRIMARY } },
+          { content: record.refNumber ? `#${record.refNumber}` : 'En attente de synchronisation', styles: { fontStyle: 'bold', textColor: COLOR_PRIMARY } },
           { content: 'Heure de décès :', styles: { fontStyle: 'bold', textColor: COLOR_DARK_TEXT } },
           { content: timeOfDeathStr, styles: { textColor: COLOR_DARK_TEXT } }
         ],

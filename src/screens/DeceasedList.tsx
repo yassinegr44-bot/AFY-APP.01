@@ -18,9 +18,11 @@ export function DeceasedList({ data, onSelectDeceased, onNavigate }: DeceasedLis
   const [filter, setFilter] = useState<'all' | 'in_facility' | 'released' | 'urgent'>('all');
 
   const filtered = deceased.filter((d: DeceasedRecord) => {
+    const searchStr = searchTerm.toLowerCase();
     const matchesSearch = 
-      d.refNumber.toLowerCase().includes(searchTerm.toLowerCase()) || 
-      (d.name && d.name.toLowerCase().includes(searchTerm.toLowerCase()));
+      (d.refNumber && d.refNumber.toLowerCase().includes(searchStr)) || 
+      (d.name && d.name.toLowerCase().includes(searchStr)) ||
+      (d.syncStatus === 'pending' && 'en attente'.includes(searchStr));
     
     let matchesFilter = true;
     if (filter === 'in_facility') matchesFilter = d.status === 'in_facility';
@@ -109,6 +111,7 @@ export function DeceasedList({ data, onSelectDeceased, onNavigate }: DeceasedLis
                 const diff = differenceInDays(new Date(), record.admissionDate.toDate());
                 const isUrgent = record.status === 'in_facility' && (diff >= settings.alertThresholdDays || record.isUnknown);
                 const isApproaching = record.status === 'in_facility' && !isUrgent && diff >= settings.alertThresholdDays - 3;
+                const isPending = record.syncStatus === 'pending' || !record.refNumber;
 
                 return (
                   <tr 
@@ -117,14 +120,22 @@ export function DeceasedList({ data, onSelectDeceased, onNavigate }: DeceasedLis
                     className="hover:bg-slate-50/50 dark:hover:bg-slate-950 transition-colors cursor-pointer group"
                   >
                     <td className="px-6 py-5">
-                      <span className={cn(
-                        "text-xs font-black px-3 py-1 rounded-lg border",
-                        isUrgent ? "bg-red-50 dark:bg-red-900/30 text-red-600 dark:text-red-400 border-red-100 dark:border-red-900/30" : 
-                        isApproaching ? "bg-amber-50 dark:bg-amber-900/30 text-amber-600 dark:text-amber-400 border-amber-100 dark:border-amber-900/30" :
-                        "text-[#006050] dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-900/20 border-emerald-100/50 dark:border-emerald-900/30"
-                      )}>
-                        {record.refNumber}
-                      </span>
+                      <div className="flex flex-col gap-1">
+                        <span className={cn(
+                          "text-xs font-black px-3 py-1 rounded-lg border inline-flex w-fit",
+                          isPending ? "bg-slate-100 dark:bg-slate-800 text-slate-400 border-slate-200 dark:border-slate-700 italic" :
+                          isUrgent ? "bg-red-50 dark:bg-red-900/30 text-red-600 dark:text-red-400 border-red-100 dark:border-red-900/30" : 
+                          isApproaching ? "bg-amber-50 dark:bg-amber-900/30 text-amber-600 dark:text-amber-400 border-amber-100 dark:border-amber-900/30" :
+                          "text-[#006050] dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-900/20 border-emerald-100/50 dark:border-emerald-900/30"
+                        )}>
+                          {record.refNumber || 'En attente...'}
+                        </span>
+                        {isPending && (
+                          <span className="text-[8px] font-black uppercase tracking-widest text-blue-500 animate-pulse">
+                            Synchronisation...
+                          </span>
+                        )}
+                      </div>
                     </td>
                     <td className="px-6 py-5">
                       <div className="flex items-center gap-3">

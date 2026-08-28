@@ -72,13 +72,13 @@ function AppContent() {
         }
         return <Statistics data={data} onNavigate={setCurrentScreen} />;
       case 'settings':
-        return <Settings data={data} onNavigate={setCurrentScreen} onOpenProfile={() => setShowNameModal(true)} />;
+        return <Settings data={data} onNavigate={setCurrentScreen} onOpenProfile={() => setShowNameModal(true)} onCleanupAll={data.cleanupAllHistoricalData} />;
       case 'historical-deceased':
         return <HistoricalDeceased data={data} onNavigate={setCurrentScreen} />;
       case 'deceased-detail':
         const record = data.deceased.find((d: any) => d.id === selectedDeceasedId);
         if (!record) return <DeceasedList data={data} onNavigate={setCurrentScreen} onSelectDeceased={(id) => { setSelectedDeceasedId(id); setCurrentScreen('deceased-detail'); }} />;
-        return <DeceasedDetail record={record} users={data.users} onBack={() => setCurrentScreen('deceased')} onExit={(exitData) => data.registerExit(record.id, exitData)} onUpdateIdentity={async (identityData) => { await data.updateDeceasedIdentity(record.id, identityData); }} />;
+        return <DeceasedDetail record={record} users={data.users} onBack={() => setCurrentScreen('deceased')} onExit={(exitData) => data.registerExit(record.id, exitData)} onUpdateIdentity={async (identityData) => { await data.updateDeceasedIdentity(record.id, identityData); }} onDelete={() => data.deleteDeceasedRecord(record.id)} />;
       case 'amputee':
         return <AmputeeList data={data} onNavigate={setCurrentScreen} onSelectAmputee={(id) => { setSelectedAmputeeId(id); setCurrentScreen('amputee-detail'); }} />;
       case 'new-amputee':
@@ -86,7 +86,7 @@ function AppContent() {
       case 'amputee-detail':
         const amputee = data.amputees.find((a: any) => a.id === selectedAmputeeId);
         if (!amputee) return <AmputeeList data={data} onNavigate={setCurrentScreen} onSelectAmputee={(id) => { setSelectedAmputeeId(id); setCurrentScreen('amputee-detail'); }} />;
-        return <AmputeeDetail record={amputee} users={data.users} onBack={() => setCurrentScreen('amputee')} />;
+        return <AmputeeDetail record={amputee} users={data.users} onBack={() => setCurrentScreen('amputee')} onDelete={() => data.deleteAmputeeRecord(amputee.id)} />;
       default:
         return <Dashboard data={data} onNavigate={setCurrentScreen} onSelectDeceased={(id) => { setSelectedDeceasedId(id); setCurrentScreen('deceased-detail'); }} />;
     }
