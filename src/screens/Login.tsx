@@ -30,10 +30,11 @@ export function Login() {
           const userSnap = await getDoc(userRef);
 
           if (!userSnap.exists()) {
+            const isAdmin = user.email?.toLowerCase() === 'yassinegr44@gmail.com';
             await setDoc(userRef, {
               name: user.displayName || 'Utilisateur',
               email: user.email,
-              role: 'agent',
+              role: isAdmin ? 'admin' : 'staff',
               createdAt: new Date()
             });
           }
@@ -67,10 +68,11 @@ export function Login() {
         const userSnap = await getDoc(userRef);
 
         if (!userSnap.exists()) {
+          const isAdmin = user.email?.toLowerCase() === 'yassinegr44@gmail.com';
           await setDoc(userRef, {
             name: user.displayName || 'Utilisateur',
             email: user.email,
-            role: 'agent',
+            role: isAdmin ? 'admin' : 'staff',
             createdAt: new Date()
           });
         }
@@ -97,10 +99,11 @@ export function Login() {
     try {
       if (isRegistering) {
         const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+        const isAdmin = email.toLowerCase() === 'yassinegr44@gmail.com';
         await setDoc(doc(db, 'users', userCredential.user.uid), {
           name: email.split('@')[0],
           email: email,
-          role: 'agent',
+          role: isAdmin ? 'admin' : 'staff',
           createdAt: new Date()
         });
       } else {

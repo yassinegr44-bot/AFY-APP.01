@@ -9,13 +9,12 @@ export default defineConfig(() => {
     plugins: [
       react(), 
       tailwindcss(),
-      VitePWA({
+    VitePWA({
         registerType: 'autoUpdate',
-        includeAssets: ['favicon.ico', 'apple-touch-icon.png', 'mask-icon.svg'],
         manifest: {
-          name: 'AFY - Assistance Funéraire',
+          name: 'AFY - Assistance Funeraire',
           short_name: 'AFY',
-          description: 'Gestion hospitalière et funéraire professionnelle',
+          description: 'Systeme professionnel de gestion hospitaliere et funeraire avec synchronisation en temps reel et support hors ligne.',
           theme_color: '#006050',
           background_color: '#ffffff',
           display: 'standalone',
@@ -74,6 +73,10 @@ export default defineConfig(() => {
         }
       })
     ],
+    build: {
+      outDir: 'dist',
+      emptyOutDir: true,
+    },
     resolve: {
       alias: {
         '@': path.resolve(__dirname, '.'),

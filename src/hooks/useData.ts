@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { 
   collection, 
   query, 
@@ -28,6 +28,7 @@ export function useData(currentUser: AppUser | null | undefined) {
   const [users, setUsers] = useState<AppUser[]>([]);
   const [settings, setSettings] = useState<AppSettings>({ alertThresholdDays: 15 });
   const [loading, setLoading] = useState(true);
+  const isInitializingRef = useRef(false);
 
   useEffect(() => {
     if (!currentUser?.id) {
@@ -54,11 +55,10 @@ export function useData(currentUser: AppUser | null | undefined) {
     const qFridge = query(collection(db, 'fridge'), orderBy('position', 'asc'));
     const unsubFridge = onSnapshot(qFridge, (snapshot) => {
       // Expecting 10 (normal) + 10 (legal) + 15 (neonat) = 35 positions
-      if (snapshot.empty || snapshot.size < 35) {
+      if (snapshot.size < 35) {
         initializeFridge();
-      } else {
-        setFridge(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as FridgePosition)));
       }
+      setFridge(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as FridgePosition)));
     }, (err) => {
       console.warn("Snapshot subscription notice (fridge):", err.message);
     });
@@ -88,71 +88,102 @@ export function useData(currentUser: AppUser | null | undefined) {
   }, [currentUser?.id]);
 
   const initializeFridge = async () => {
-    const fridgeSnapshot = await getDocs(collection(db, 'fridge'));
-    const existingIds = new Set(fridgeSnapshot.docs.map(d => d.id));
+    // Prevent concurrent initialization attempts
+    if (isInitializingRef.current) return;
+    isInitializingRef.current = true;
 
-    // 1. Ensure all positions exist (Normal, Medico-Legal, Neonat)
-    // Frigos 1 to 10
-    for (let i = 1; i <= 10; i++) {
-      const id = `pos_${i}`;
-      if (!existingIds.has(id)) {
-        await setDoc(doc(db, 'fridge', id), {
-          position: i,
-          fridgeNumber: i,
-          type: 'normal',
-          status: 'available'
-        });
+    try {
+      const fridgeSnapshot = await getDocs(collection(db, 'fridge'));
+      const existingIds = new Set(fridgeSnapshot.docs.map(d => d.id));
+      
+      // If we already have 35 or more on the server, we don't need to initialize
+      if (existingIds.size >= 35) {
+        isInitializingRef.current = false;
+        return;
       }
-    }
-    // Frigo 11
-    for (let i = 1; i <= 10; i++) {
-      const id = `pos_11_${i}`;
-      if (!existingIds.has(id)) {
-        await setDoc(doc(db, 'fridge', id), {
-          position: i,
-          fridgeNumber: 11,
-          type: 'medico_legal',
-          status: 'available'
-        });
-      }
-    }
-    // Frigo 12
-    for (let i = 1; i <= 15; i++) {
-      const id = `pos_12_${i}`;
-      if (!existingIds.has(id)) {
-        await setDoc(doc(db, 'fridge', id), {
-          position: i,
-          fridgeNumber: 12,
-          type: 'neonat',
-          status: 'available'
-        });
-      }
-    }
 
-    // 2. Sync occupied status from records to handle any previous data resets
-    const deceasedSnapshot = await getDocs(query(collection(db, 'deceased'), where('status', '==', 'in_facility')));
-    const amputeesSnapshot = await getDocs(query(collection(db, 'amputees'), where('status', '==', 'in_facility')));
+      const batch = writeBatch(db);
+      let needsBatch = false;
 
-    const records = [
-      ...deceasedSnapshot.docs.map(d => ({ id: d.id, ...d.data() })),
-      ...amputeesSnapshot.docs.map(d => ({ id: d.id, ...d.data() }))
-    ];
-
-    for (const record of records) {
-      const r = record as any;
-      if (r.fridgeNumber && r.fridgePosition) {
-        let fridgeId = '';
-        if (r.fridgeNumber === 11) fridgeId = `pos_11_${r.fridgePosition}`;
-        else if (r.fridgeNumber === 12) fridgeId = `pos_12_${r.fridgePosition}`;
-        else if (r.fridgeNumber >= 1 && r.fridgeNumber <= 10) fridgeId = `pos_${r.fridgeNumber}`;
-
-        if (fridgeId) {
-          await updateDoc(doc(db, 'fridge', fridgeId), {
-            status: 'occupied',
-            deceasedId: r.id
+      // 1. Ensure all positions exist (Normal, Medico-Legal, Neonat)
+      // Frigos 1 to 10
+      for (let i = 1; i <= 10; i++) {
+        const id = `pos_${i}`;
+        if (!existingIds.has(id)) {
+          batch.set(doc(db, 'fridge', id), {
+            position: i,
+            fridgeNumber: i,
+            type: 'normal',
+            status: 'available'
           });
+          needsBatch = true;
         }
       }
+      // Frigo 11
+      for (let i = 1; i <= 10; i++) {
+        const id = `pos_11_${i}`;
+        if (!existingIds.has(id)) {
+          batch.set(doc(db, 'fridge', id), {
+            position: i,
+            fridgeNumber: 11,
+            type: 'medico_legal',
+            status: 'available'
+          });
+          needsBatch = true;
+        }
+      }
+      // Frigo 12
+      for (let i = 1; i <= 15; i++) {
+        const id = `pos_12_${i}`;
+        if (!existingIds.has(id)) {
+          batch.set(doc(db, 'fridge', id), {
+            position: i,
+            fridgeNumber: 12,
+            type: 'neonat',
+            status: 'available'
+          });
+          needsBatch = true;
+        }
+      }
+
+      if (needsBatch) {
+        await batch.commit();
+      }
+
+      // 2. Sync occupied status from records to handle any previous data resets
+      // Note: We use writeBatch here too for the healing process
+      const syncBatch = writeBatch(db);
+      let needsSync = false;
+
+      const deceasedSnapshot = await getDocs(query(collection(db, 'deceased'), where('status', '==', 'in_facility')));
+      const amputeesSnapshot = await getDocs(query(collection(db, 'amputees'), where('status', '==', 'in_facility')));
+
+      const records = [
+        ...deceasedSnapshot.docs.map(d => ({ id: d.id, ...d.data() })),
+        ...amputeesSnapshot.docs.map(d => ({ id: d.id, ...d.data() }))
+      ];
+
+      for (const record of records) {
+        const r = record as any;
+        if (r.fridgeNumber && r.fridgePosition) {
+          const fridgeId = getFridgeDocId(r.fridgeNumber, r.fridgePosition);
+          if (fridgeId) {
+            syncBatch.update(doc(db, 'fridge', fridgeId), {
+              status: 'occupied',
+              deceasedId: r.id
+            });
+            needsSync = true;
+          }
+        }
+      }
+
+      if (needsSync) {
+        await syncBatch.commit();
+      }
+    } catch (err) {
+      console.warn("Notice: Fridge initialization skipped or delayed (offline):", err);
+    } finally {
+      isInitializingRef.current = false;
     }
   };
 
@@ -168,15 +199,13 @@ export function useData(currentUser: AppUser | null | undefined) {
   };
 
   const registerDeceased = async (data: any) => {
-    const currentYear = new Date().getFullYear();
-
     let finalCaseType = data.caseType || 'DÉCÈS';
     let fridgePos = data.fridgePosition;
-    let fridgeDocId = '';
     let fridgeNum = 1;
 
     // Use local fridge state instead of getDocs for offline-first
     const fridgePositions = fridge;
+    let selectedPosition: FridgePosition | undefined;
 
     if (finalCaseType === 'FŒTUS' || finalCaseType === 'MORT_NÉ' || finalCaseType === 'ENFANT_MOINS_1_AN') {
       const neonatPositions = fridgePositions
@@ -186,8 +215,8 @@ export function useData(currentUser: AppUser | null | undefined) {
       if (neonatPositions.length === 0) {
         throw new Error("⚠️ Unité Néonatale (Frigo 12) est complète\nCapacité maximale : 15/15\nAucune nouvelle affectation automatique possible.");
       }
-      fridgePos = neonatPositions[0].position;
-      fridgeDocId = neonatPositions[0].id;
+      selectedPosition = neonatPositions[0];
+      fridgePos = selectedPosition.position;
       fridgeNum = 12;
     } else if (finalCaseType === 'MEMBRE_AMPUTÉ') {
       const medicoLegalPositions = fridgePositions
@@ -197,20 +226,22 @@ export function useData(currentUser: AppUser | null | undefined) {
       if (medicoLegalPositions.length === 0) {
         throw new Error("⚠️ Unité Médico-Légale (Frigo 11) est complète\nCapacité maximale : 10/10\nAucune nouvelle affectation possible.");
       }
-      fridgePos = medicoLegalPositions[0].position;
-      fridgeDocId = medicoLegalPositions[0].id;
+      selectedPosition = medicoLegalPositions[0];
+      fridgePos = selectedPosition.position;
       fridgeNum = 11;
     } else {
       if (!fridgePos || fridgePos === 0) {
         throw new Error("Veuillez sélectionner une position dans les Frigos 1 à 10.");
       }
-      const normalPos = fridgePositions.find(p => p.fridgeNumber === Number(fridgePos) && p.status === 'available');
-      if (!normalPos) {
+      selectedPosition = fridgePositions.find(p => p.fridgeNumber === Number(fridgePos) && p.status === 'available');
+      if (!selectedPosition) {
         throw new Error(`⚠️ La position Frigo ${fridgePos} est déjà occupée ou indisponible.`);
       }
-      fridgeDocId = normalPos.id;
       fridgeNum = Number(fridgePos);
     }
+
+    const fridgeDocId = getFridgeDocId(fridgeNum, fridgePos);
+    if (!fridgeDocId) throw new Error("Erreur de détermination de l'emplacement du frigo.");
 
     const operatorIdentity = getActiveOperatorIdentity();
     const operatorUid = currentUser?.id || '';
@@ -222,7 +253,6 @@ export function useData(currentUser: AppUser | null | undefined) {
       caseType: finalCaseType,
       fridgePosition: fridgePos,
       fridgeNumber: fridgeNum,
-      // refNumber will be assigned by the server
       syncStatus: 'pending',
       status: 'in_facility',
       createdBy: operatorIdentity,
@@ -243,20 +273,23 @@ export function useData(currentUser: AppUser | null | undefined) {
       createdAt: serverTimestamp(),
       updatedAt: serverTimestamp()
     };
-    const docRef = await addDoc(collection(db, 'deceased'), record);
+
+    // USE WRITE BATCH FOR ATOMICITY
+    const batch = writeBatch(db);
+    const deceasedRef = doc(collection(db, 'deceased'));
+    batch.set(deceasedRef, record);
     
-    // Update fridge status
-    if (fridgeDocId) {
-      await updateDoc(doc(db, 'fridge', fridgeDocId), {
-        status: 'occupied',
-        deceasedId: docRef.id
-      });
-    }
-    return docRef.id;
+    batch.update(doc(db, 'fridge', fridgeDocId), {
+      status: 'occupied',
+      deceasedId: deceasedRef.id
+    });
+
+    await batch.commit();
+    return deceasedRef.id;
   };
 
   const registerAmputee = async (data: Omit<AmputeeRecord, 'id' | 'refNumber' | 'createdAt'>) => {
-    // Use local fridge state instead of getDocs
+    // Use local fridge state
     const fridgePositions = fridge;
     const medicoLegalPositions = fridgePositions
       .filter(p => p.fridgeNumber === 11 && p.status === 'available')
@@ -266,13 +299,13 @@ export function useData(currentUser: AppUser | null | undefined) {
       throw new Error("⚠️ Unité Médico-Légale (Frigo 11) est complète\nCapacité maximale : 10/10\nAucune nouvelle affectation possible.");
     }
     const fridgePos = medicoLegalPositions[0].position;
-    const fridgeDocId = medicoLegalPositions[0].id;
+    const fridgeDocId = getFridgeDocId(11, fridgePos);
+    if (!fridgeDocId) throw new Error("Erreur de détermination de l'emplacement du frigo.");
 
     const operatorIdentity = getActiveOperatorIdentity();
 
     const record = {
       ...data,
-      // refNumber will be assigned by the server
       syncStatus: 'pending',
       fridgePosition: fridgePos,
       fridgeNumber: 11,
@@ -283,16 +316,18 @@ export function useData(currentUser: AppUser | null | undefined) {
       createdByName: currentUser?.name || '',
       createdAt: serverTimestamp()
     };
-    const docRef = await addDoc(collection(db, 'amputees'), record);
 
-    if (fridgeDocId) {
-      await updateDoc(doc(db, 'fridge', fridgeDocId), {
-        status: 'occupied',
-        deceasedId: docRef.id
-      });
-    }
+    const batch = writeBatch(db);
+    const amputeeRef = doc(collection(db, 'amputees'));
+    batch.set(amputeeRef, record);
 
-    return docRef.id;
+    batch.update(doc(db, 'fridge', fridgeDocId), {
+      status: 'occupied',
+      deceasedId: amputeeRef.id
+    });
+
+    await batch.commit();
+    return amputeeRef.id;
   };
 
   const getFridgeDocId = (fridgeNumber: number, fridgePosition: number) => {
@@ -349,10 +384,10 @@ export function useData(currentUser: AppUser | null | undefined) {
   };
 
   const registerExit = async (id: string, exitData: any) => {
-    const recordRef = doc(db, 'deceased', id);
     const deceasedRecord = deceased.find(d => d.id === id);
     if (!deceasedRecord) return;
 
+    const recordRef = doc(db, 'deceased', id);
     const operatorIdentity = getActiveOperatorIdentity();
     const operatorUid = currentUser?.id || '';
     const operatorRole = currentUser?.role || 'staff';
@@ -370,7 +405,9 @@ export function useData(currentUser: AppUser | null | undefined) {
       operatorName
     };
     
-    await updateDoc(recordRef, {
+    const batch = writeBatch(db);
+
+    batch.update(recordRef, {
       status: 'released',
       exitDate: Timestamp.fromDate(exitData.exitDate),
       exitTime: exitData.exitTime || '',
@@ -400,12 +437,14 @@ export function useData(currentUser: AppUser | null | undefined) {
     if (deceasedRecord?.fridgePosition && deceasedRecord?.fridgeNumber) {
       const fridgeId = getFridgeDocId(deceasedRecord.fridgeNumber, deceasedRecord.fridgePosition);
       if (fridgeId) {
-        await updateDoc(doc(db, 'fridge', fridgeId), {
+        batch.update(doc(db, 'fridge', fridgeId), {
           status: 'available',
           deceasedId: null
         });
       }
     }
+
+    await batch.commit();
   };
 
   const updateDeceasedIdentity = async (id: string, newIdentityData: Partial<DeceasedRecord>) => {

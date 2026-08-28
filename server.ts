@@ -2,7 +2,7 @@ import express from "express";
 import path from "path";
 import { createServer as createViteServer } from "vite";
 import * as admin from "firebase-admin";
-import firebaseConfig from "./firebase-applet-config.json";
+import firebaseConfig from "./firebase-applet-config.json" with { type: "json" };
 
 const adminAny = admin as any;
 
@@ -32,13 +32,59 @@ const getAdminFirestore = () => {
   return fsFn ? fsFn() : null;
 };
 
-const app = express();
+export const app = express();
 const PORT = 3000;
 
 app.use(express.json());
 
+// --- AUTHENTICATION & AUTHORIZATION MIDDLEWARE ---
+export const requireAdmin = async (req: express.Request, res: express.Response, next: express.NextFunction) => {
+  try {
+    const authHeader = req.headers.authorization;
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      return res.status(401).json({ error: "Unauthorized: Missing or invalid Authorization header" });
+    }
+
+    const token = authHeader.split('Bearer ')[1];
+    const auth = getAdminAuth();
+    if (!auth) throw new Error("Auth service unavailable");
+    
+    let decodedToken;
+    try {
+      decodedToken = await auth.verifyIdToken(token);
+    } catch (err: any) {
+      if (err.code === 'auth/id-token-expired') {
+        return res.status(401).json({ error: "Unauthorized: Token expired" });
+      }
+      return res.status(401).json({ error: "Unauthorized: Invalid token" });
+    }
+
+    const db = getAdminFirestore();
+    if (!db) throw new Error("Firestore service unavailable");
+
+    // Fetch user role from Firestore
+    const userDoc = await db.collection('users').doc(decodedToken.uid).get();
+    const userData = userDoc.data();
+
+    // Verify admin role (either superadmin by email or explicit admin role in DB)
+    const isSuperAdmin = decodedToken.email?.toLowerCase() === 'yassinegr44@gmail.com';
+    const isAdmin = userData?.role === 'admin' || isSuperAdmin;
+
+    if (!isAdmin) {
+      return res.status(403).json({ error: "Forbidden: Admin access required" });
+    }
+
+    // Pass the decoded token info to the route
+    (req as any).user = decodedToken;
+    next();
+  } catch (err: any) {
+    console.error("Auth middleware error:", err.message);
+    res.status(500).json({ error: "Internal server error during authentication" });
+  }
+};
+
 // API route to delete user from Firebase Auth & Firestore
-app.post("/api/admin/delete-user", async (req, res) => {
+app.post("/api/admin/delete-user", requireAdmin, async (req, res) => {
   try {
     const { uid } = req.body;
     if (!uid) {
@@ -46,6 +92,7 @@ app.post("/api/admin/delete-user", async (req, res) => {
     }
 
     let firestoreDeleted = false;
+
 
     // 1. Delete user document from Firestore first
     try {
@@ -155,7 +202,9 @@ const setupAttributionEngine = () => {
 };
 
 // Start the engine
-setupAttributionEngine();
+if (!process.env.VITEST && process.env.NODE_ENV !== 'test') {
+  setupAttributionEngine();
+}
 
 app.get("/api/health", (req, res) => {
   res.json({ status: "ok" });
@@ -163,16 +212,16 @@ app.get("/api/health", (req, res) => {
 
 async function startServer() {
   // Vite middleware for development
-  if (process.env.NODE_ENV !== "production") {
+  if (process.env.NODE_ENV !== "production" && process.env.NODE_ENV !== "test" && !process.env.VITEST) {
     const vite = await createViteServer({
       server: { middlewareMode: true },
       appType: "spa",
     });
     app.use(vite.middlewares);
-  } else {
+  } else if (process.env.NODE_ENV !== "test" && !process.env.VITEST) {
     const distPath = path.join(process.cwd(), 'dist');
     app.use(express.static(distPath));
-    app.get('*all', (req, res) => {
+    app.get('*', (req, res) => {
       res.sendFile(path.join(distPath, 'index.html'));
     });
   }
@@ -182,4 +231,6 @@ async function startServer() {
   });
 }
 
-startServer();
+if (!process.env.VITEST && process.env.NODE_ENV !== 'test') {
+  startServer();
+}

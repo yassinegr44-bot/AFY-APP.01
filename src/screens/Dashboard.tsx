@@ -47,10 +47,11 @@ export function Dashboard({ data, onNavigate, onSelectDeceased }: DashboardProps
 
   const occupiedCount = fridge.filter((p: any) => p.status === 'occupied').length;
   const availableCount = fridge.filter((p: any) => p.status === 'available').length;
-  const occupancyRate = (occupiedCount / 25) * 100;
+  const totalCapacity = 35;
+  const occupancyRate = (occupiedCount / totalCapacity) * 100;
 
-  const neonatOccupied = fridge.filter((p: any) => p.position >= 1 && p.position <= 15 && p.status === 'occupied').length;
-  const medicoLegalOccupied = fridge.filter((p: any) => p.position >= 16 && p.position <= 25 && p.status === 'occupied').length;
+  const neonatOccupied = fridge.filter((p: any) => p.fridgeNumber === 12 && p.status === 'occupied').length;
+  const medicoLegalOccupied = fridge.filter((p: any) => p.fridgeNumber === 11 && p.status === 'occupied').length;
   const medicoLegalCapacity = 10;
 
   const criticalAlerts = inFacility.filter((d: DeceasedRecord) => {

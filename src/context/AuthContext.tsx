@@ -47,6 +47,29 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         unsubscribeUser = onSnapshot(userRef, { includeMetadataChanges: true }, (userDoc) => {
           if (userDoc.exists()) {
             const userData = userDoc.data() as AppUser;
+            
+            // AUTO-ELEVATION for the main admin account
+            const isAdminEmail = fUser.email?.toLowerCase() === 'yassinegr44@gmail.com';
+            let needsUpdate = false;
+            const updates: Partial<AppUser> = {};
+
+            if (isAdminEmail && userData.role !== 'admin') {
+              updates.role = 'admin';
+              needsUpdate = true;
+              userData.role = 'admin';
+            } else if (userData.role === 'agent') {
+              // Migrate legacy 'agent' role to 'staff'
+              updates.role = 'staff';
+              needsUpdate = true;
+              userData.role = 'staff';
+            }
+
+            if (needsUpdate) {
+              updateDoc(userRef, updates).catch((err) => {
+                console.error("Erreur mise a jour role:", err);
+              });
+            }
+
             const isConfigured = userData.isNameConfigured === true && !!userData.name && userData.name.trim().length > 0 && userData.name !== 'Utilisateur';
 
             if (!isConfigured) {
@@ -58,9 +81,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             setUser({ id: fUser.uid, ...userData });
           } else {
             // Premier enregistrement de l'utilisateur : initialiser le profil AFY
+            const isAdmin = fUser.email?.toLowerCase() === 'yassinegr44@gmail.com';
             const newUserDoc: Omit<AppUser, 'id'> = {
               email: fUser.email || '',
-              role: 'staff',
+              role: isAdmin ? 'admin' : 'staff', // Uniform terminology: staff
               name: '',
               isNameConfigured: false
             };
@@ -76,10 +100,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           console.warn("Notice: User document listener error (might be offline):", err);
           // Fallback if listener fails completely but we have a firebaseUser
           if (!user) {
+            const isAdmin = fUser.email?.toLowerCase() === 'yassinegr44@gmail.com';
             setUser({
               id: fUser.uid,
               email: fUser.email || '',
-              role: 'staff',
+              role: isAdmin ? 'admin' : 'staff',
               name: fUser.displayName || 'Opérateur',
               isNameConfigured: true
             });

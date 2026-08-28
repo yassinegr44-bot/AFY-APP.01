@@ -1,6 +1,6 @@
 {
-  "name": "AFY — Assistance Funéraire",
-  "description": "Système professionnel de gestion hospitalière et funéraire avec synchronisation en temps réel et support hors ligne.",
+  "name": "AFY - Assistance Funeraire",
+  "description": "Systeme professionnel de gestion hospitaliere et funeraire avec synchronisation en temps reel et support hors ligne.",
   "requestFramePermissions": [],
   "majorCapabilities": [
     "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"

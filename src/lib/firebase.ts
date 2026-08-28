@@ -18,22 +18,23 @@ const dbId = (firebaseConfig as any).firestoreDatabaseId || '(default)';
 
 let firestoreDb;
 try {
+  // Use initializeFirestore with explicit settings
   firestoreDb = initializeFirestore(app, {
     localCache: persistentLocalCache({
       tabManager: persistentSingleTabManager({})
     }),
-    experimentalAutoDetectLongPolling: true,
+    experimentalForceLongPolling: true,
   }, dbId);
-} catch (e) {
-  try {
-    firestoreDb = initializeFirestore(app, {
-      localCache: memoryLocalCache(),
-      experimentalAutoDetectLongPolling: true,
-    }, dbId);
-  } catch (err) {
+} catch (e: any) {
+  // If already initialized, get existing instance
+  if (e.code === 'failed-precondition' || e.message?.includes('already been initialized')) {
+    firestoreDb = getFirestore(app, dbId);
+  } else {
+    // Fallback for other errors
     firestoreDb = getFirestore(app, dbId);
   }
 }
+
 export const db = firestoreDb;
 
 

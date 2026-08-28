@@ -35,7 +35,7 @@ export function Statistics({ data, onNavigate }: StatisticsProps) {
   const mortNeCount = deceased.filter((d: any) => d.caseType === 'MORT_NÉ').length;
   const enfantCount = deceased.filter((d: any) => d.caseType === 'ENFANT_MOINS_1_AN').length;
   const membreAmputeTotalCount = deceased.filter((d: any) => d.caseType === 'MEMBRE_AMPUTÉ').length + amputees.length;
-  const frigo12OccupiedCount = (data.fridge || []).filter((p: any) => p.position >= 1 && p.position <= 15 && p.status === 'occupied').length;
+  const frigo12OccupiedCount = (data.fridge || []).filter((p: any) => p.fridgeNumber === 12 && p.status === 'occupied').length;
 
   const pieData = [
     { name: 'Actifs', value: inFacilityCount, color: '#10b981' },

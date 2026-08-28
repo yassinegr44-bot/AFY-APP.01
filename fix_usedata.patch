@@ -1,0 +1,15 @@
+--- src/hooks/useData.ts
++++ src/hooks/useData.ts
+@@ -52,11 +52,9 @@
+     const qFridge = query(collection(db, 'fridge'), orderBy('position', 'asc'));
+     const unsubFridge = onSnapshot(qFridge, (snapshot) => {
+       // Expecting 10 (normal) + 10 (legal) + 15 (neonat) = 35 positions
+-      if (snapshot.empty || snapshot.size < 35) {
++      if (snapshot.size < 35) {
+         initializeFridge();
+-      } else {
+-        setFridge(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as FridgePosition)));
+       }
++      setFridge(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as FridgePosition)));
+     }, (err) => {
+       console.warn("Snapshot subscription notice (fridge):", err.message);

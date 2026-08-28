@@ -45,12 +45,22 @@ export function Settings({ data, onNavigate, onOpenProfile, onCleanupAll }: Sett
   };
 
   const demoteToAgent = async (userId: string) => {
+    const userToDemote = users.find(u => u.id === userId);
+    if (userToDemote?.email === 'yassinegr44@gmail.com') {
+      alert("Cet utilisateur est un administrateur permanent et ne peut pas être rétrogradé.");
+      return;
+    }
     await updateDoc(doc(db, 'users', userId), { role: 'agent' });
     setUsers(users.map(u => u.id === userId ? { ...u, role: 'agent' } : u));
   };
 
   const handleDeleteUserConfirm = async () => {
     if (!userToDelete) return;
+    if (userToDelete.email === 'yassinegr44@gmail.com') {
+      alert("Cet utilisateur est un administrateur permanent et ne peut pas être supprimé.");
+      setUserToDelete(null);
+      return;
+    }
     setDeletingUser(true);
     try {
       // 1. Delete Firestore user document directly
