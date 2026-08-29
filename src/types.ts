@@ -87,6 +87,14 @@ export interface DeceasedRecord {
   fridgeNumber?: number;
   status: DeceasedStatus;
   isUnknown?: boolean;
+  firstName?: string;
+  age?: number;
+  ageUnit?: 'Années' | 'Mois' | 'Semaines' | 'Jours' | 'Heures';
+  natureOfDeath?: 'Normal' | 'Fœtus' | 'Mort-né';
+  exitType?: 'Inhumation' | 'Transfert' | 'Morgue externe';
+  takingChargeCin?: string;
+  ambulanceDriverName?: string;
+  ambulanceDriverPhone?: string;
   caseType?: CaseType;
   missingBodyParts?: string[];
   otherMissingBodyPartsDescription?: string;

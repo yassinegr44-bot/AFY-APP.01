@@ -473,12 +473,7 @@ export function useData(currentUser: AppUser | null | undefined) {
     }
   };
 
-  const registerHistoricalDeceased = async (data: Omit<DeceasedRecord, 'id' | 'refNumber' | 'createdAt' | 'updatedAt' | 'isHistorical'>) => {
-    const year = data.dateOfDeath ? data.dateOfDeath.toDate().getFullYear() : new Date().getFullYear();
-    const historicalCount = deceased.filter(d => d.isHistorical).length;
-    const count = historicalCount + 1;
-    const refNumber = `HIST ${year} ${count.toString().padStart(4, '0')}`;
-
+  const registerHistoricalDeceased = async (data: Omit<DeceasedRecord, 'id' | 'createdAt' | 'updatedAt' | 'isHistorical'>) => {
     const operatorIdentity = getActiveOperatorIdentity();
     const operatorUid = currentUser?.id || '';
     const operatorRole = currentUser?.role || 'staff';
@@ -486,7 +481,6 @@ export function useData(currentUser: AppUser | null | undefined) {
 
     const record = {
       ...data,
-      refNumber,
       isHistorical: true,
       createdBy: operatorIdentity,
       createdByUid: operatorUid,
