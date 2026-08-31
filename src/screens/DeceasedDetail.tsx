@@ -24,7 +24,7 @@ import {
 import { motion, AnimatePresence } from 'motion/react';
 import { formatDate } from '../lib/utils';
 import { DeceasedRecord, TimelineEvent, AppUser } from '../types';
-import { differenceInDays, format, formatDistanceToNow } from 'date-fns';
+import { differenceInDays, format, formatDistance } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import { cn } from '../lib/utils';
 import { generateSingleDossierPDF } from '../utils/pdf';
@@ -141,10 +141,10 @@ export function DeceasedDetail({ record, users, onBack, onExit, onUpdateIdentity
 
   const isReleased = record.status === 'released';
   const isPending = record.syncStatus === 'pending' || !record.refNumber;
-  const admissionDate = record.admissionDate.toDate();
+  const admissionDate = record.admissionDate ? record.admissionDate.toDate() : new Date();
   const exitDate = isReleased && record.exitDate ? record.exitDate.toDate() : new Date();
-  const diff = differenceInDays(exitDate, admissionDate);
-  const durationText = formatDistanceToNow(admissionDate, { locale: fr, addSuffix: false });
+  const diff = record.admissionDate ? differenceInDays(exitDate, admissionDate) : 0;
+  const durationText = record.admissionDate ? formatDistance(admissionDate, exitDate, { locale: fr, addSuffix: false }) : 'N/A';
   
   // Use a fixed 15-day threshold for consistent UI or pass from data
   const threshold = 15; 
@@ -251,7 +251,7 @@ export function DeceasedDetail({ record, users, onBack, onExit, onUpdateIdentity
           <p className="text-sm font-bold text-slate-400 uppercase tracking-widest">{record.gender === 'Masculin' ? 'Sexe Masculin' : record.gender === 'Féminin' ? 'Sexe Féminin' : `Sexe : ${record.otherGender || 'Autre'}`}</p>
           <div className="flex items-center gap-2 mt-1">
             <Clock size={12} className="text-slate-400" />
-            <p className="text-xs font-black text-[#006050] dark:text-emerald-400 uppercase tracking-tighter">Présent depuis {durationText}</p>
+            <p className="text-xs font-black text-[#006050] dark:text-emerald-400 uppercase tracking-tighter">{isReleased ? 'Séjour de' : 'Présent depuis'} {durationText}</p>
           </div>
           {isUrgent && (
             <span className={cn(
@@ -266,8 +266,8 @@ export function DeceasedDetail({ record, users, onBack, onExit, onUpdateIdentity
 
       {/* Quick Stats Grid */}
       <div className="grid grid-cols-3 gap-3">
-        <StatCard label="Admission" value={format(record.admissionDate.toDate(), 'dd MMM')} icon={Calendar} color="blue" />
-        <StatCard label="Position" value={record.fridgePosition && record.fridgePosition !== -1 ? `Frigo ${record.fridgePosition.toString().padStart(2, '0')}` : 'Frigo Inconnu'} icon={Refrigerator} color="emerald" />
+        <StatCard label="Admission" value={record.admissionDate ? format(record.admissionDate.toDate(), 'dd MMM') : 'N/A'} icon={Calendar} color="blue" />
+        <StatCard label="Position" value={record.isHistorical || record.fridgePosition === 999 || record.fridgePosition === 'X' ? 'X' : record.fridgePosition && record.fridgePosition !== -1 ? `Frigo ${record.fridgePosition.toString().padStart(2, '0')}` : 'Frigo Inconnu'} icon={Refrigerator} color="emerald" />
         <StatCard label="Durée Totale" value={`${diff} Jours`} icon={Clock} color={isUrgent ? "red" : isApproaching ? "orange" : "blue"} />
       </div>
 
@@ -342,13 +342,15 @@ export function DeceasedDetail({ record, users, onBack, onExit, onUpdateIdentity
 
         <DetailSection title="Logistique Morgue" icon={Refrigerator}>
           <DetailRow label="Affectation Frigo" value={
-            record.fridgeNumber === 12 
+            record.isHistorical || record.fridgePosition === 999 || record.fridgePosition === 'X'
+              ? 'X'
+              : record.fridgeNumber === 12 
               ? `Frigo 12 (Néonat) — Pos ${record.fridgePosition.toString().padStart(2, '0')}`
               : record.fridgeNumber === 11
                 ? 'Frigo 11 (Médico-Légal)'
                 : `Frigo ${record.fridgeNumber || record.fridgePosition}`
           } highlight />
-          <DetailRow label="Date Admission" value={format(record.admissionDate.toDate(), 'dd/MM/yyyy HH:mm')} />
+          <DetailRow label="Date Admission" value={record.admissionDate ? format(record.admissionDate.toDate(), 'dd/MM/yyyy HH:mm') : 'Non renseignée'} />
           {isReleased && record.exitDate && (
             <div className="mt-4 pt-4 border-t border-slate-100 dark:border-slate-800 space-y-2">
               <DetailRow label="Date de Sortie" value={format(record.exitDate.toDate(), 'dd/MM/yyyy HH:mm')} highlight />

@@ -35,6 +35,7 @@ export function HistoricalDeceased({ data, onNavigate }: HistoricalDeceasedProps
   const [formData, setFormData] = useState({
     name: '',
     firstName: '',
+    isUnknown: false,
     cin: '',
     refNumber: '',
     gender: 'Indéterminé',
@@ -96,10 +97,12 @@ export function HistoricalDeceased({ data, onNavigate }: HistoricalDeceasedProps
     setFormData({
       name: '',
       firstName: '',
+      isUnknown: false,
       cin: '',
       refNumber: '',
       gender: 'Indéterminé',
       age: '',
+      ageUnit: 'Années',
       dateOfDeath: '',
       natureOfDeath: 'Normal',
       cause: 'Naturelle',
@@ -124,6 +127,7 @@ export function HistoricalDeceased({ data, onNavigate }: HistoricalDeceasedProps
     setFormData({
       name: record.name || '',
       firstName: record.firstName || '',
+      isUnknown: record.isUnknown || record.name === 'X fils de X (Inconnu)' || false,
       cin: record.cin || '',
       refNumber: record.refNumber || '',
       gender: record.gender || 'Indéterminé',
@@ -148,8 +152,8 @@ export function HistoricalDeceased({ data, onNavigate }: HistoricalDeceasedProps
   };
 
   const handleCreateSubmit = async () => {
-    if (!formData.name || !formData.firstName) {
-      alert("Veuillez renseigner le nom et le prénom.");
+    if (!formData.isUnknown && (!formData.name || !formData.firstName)) {
+      alert("Veuillez renseigner le nom et le prénom ou cocher l'identité inconnue.");
       return;
     }
     setLoading(true);
@@ -158,6 +162,7 @@ export function HistoricalDeceased({ data, onNavigate }: HistoricalDeceasedProps
       const recordPayload: any = {
         name: formData.name,
         firstName: formData.firstName,
+        isUnknown: formData.isUnknown,
         cin: formData.cin,
         refNumber: formData.refNumber,
         gender: formData.gender,
@@ -179,9 +184,9 @@ export function HistoricalDeceased({ data, onNavigate }: HistoricalDeceasedProps
         
         status: 'released', // Always released for history
         origin: 'Marocain', // Safe default mapping
-        admissionTime: '12:00',
-        timeOfDeath: '12:00',
-        fridgePosition: 999 // Placeholder
+        admissionTime: 'X',
+        timeOfDeath: 'X',
+        fridgePosition: 'X' // Placeholder
       };
 
       await registerHistoricalDeceased(recordPayload);
@@ -200,8 +205,8 @@ export function HistoricalDeceased({ data, onNavigate }: HistoricalDeceasedProps
 
   const handleEditSubmit = async () => {
     if (!selectedRecord) return;
-    if (!formData.name || !formData.firstName) {
-      alert("Veuillez renseigner le nom et le prénom.");
+    if (!formData.isUnknown && (!formData.name || !formData.firstName)) {
+      alert("Veuillez renseigner le nom et le prénom ou cocher l'identité inconnue.");
       return;
     }
     setLoading(true);
@@ -210,6 +215,7 @@ export function HistoricalDeceased({ data, onNavigate }: HistoricalDeceasedProps
       const recordPayload: any = {
         name: formData.name,
         firstName: formData.firstName,
+        isUnknown: formData.isUnknown,
         cin: formData.cin,
         refNumber: formData.refNumber,
         gender: formData.gender,
@@ -418,18 +424,36 @@ export function HistoricalDeceased({ data, onNavigate }: HistoricalDeceasedProps
                 <div className="space-y-6">
                   {currentStep === 1 && (
                     <motion.div initial={{ opacity: 0, x: 10 }} animate={{ opacity: 1, x: 0 }} className="space-y-4">
+                      <div className="flex items-center gap-2 bg-indigo-50/50 dark:bg-indigo-900/10 p-3 rounded-xl border border-indigo-100 dark:border-indigo-900/30">
+                        <input 
+                          type="checkbox" 
+                          id="isUnknownHistorical"
+                          className="w-4 h-4 rounded border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-950 text-indigo-600 focus:ring-indigo-600"
+                          checked={formData.isUnknown}
+                          onChange={e => setFormData({
+                            ...formData, 
+                            isUnknown: e.target.checked, 
+                            name: e.target.checked ? "X fils de X (Inconnu)" : "",
+                            firstName: e.target.checked ? "" : formData.firstName
+                          })}
+                        />
+                        <label htmlFor="isUnknownHistorical" className="text-xs font-black text-indigo-700 dark:text-indigo-400 uppercase tracking-widest cursor-pointer">
+                          Identité inconnue (X fils de X)
+                        </label>
+                      </div>
+
                       <div className="grid grid-cols-2 gap-4">
                         <div>
                           <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5">Nom *</label>
-                          <input type="text" className="w-full px-4 py-3 bg-slate-50 dark:bg-slate-950 rounded-xl border border-slate-200 dark:border-slate-800 focus:ring-2 focus:ring-indigo-500 font-semibold" value={formData.name} onChange={e => setFormData({...formData, name: e.target.value})} />
+                          <input type="text" className={cn("w-full px-4 py-3 bg-slate-50 dark:bg-slate-950 rounded-xl border border-slate-200 dark:border-slate-800 focus:ring-2 focus:ring-indigo-500 font-semibold", formData.isUnknown && "text-slate-400 bg-slate-100/50 dark:bg-slate-900/50")} value={formData.name} onChange={e => setFormData({...formData, name: e.target.value, isUnknown: false})} disabled={formData.isUnknown} />
                         </div>
                         <div>
                           <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5">Prénom *</label>
-                          <input type="text" className="w-full px-4 py-3 bg-slate-50 dark:bg-slate-950 rounded-xl border border-slate-200 dark:border-slate-800 focus:ring-2 focus:ring-indigo-500 font-semibold" value={formData.firstName} onChange={e => setFormData({...formData, firstName: e.target.value})} />
+                          <input type="text" className={cn("w-full px-4 py-3 bg-slate-50 dark:bg-slate-950 rounded-xl border border-slate-200 dark:border-slate-800 focus:ring-2 focus:ring-indigo-500 font-semibold", formData.isUnknown && "text-slate-400 bg-slate-100/50 dark:bg-slate-900/50")} value={formData.firstName} onChange={e => setFormData({...formData, firstName: e.target.value, isUnknown: false})} disabled={formData.isUnknown} />
                         </div>
                         <div>
                           <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5">CNI</label>
-                          <input type="text" className="w-full px-4 py-3 bg-slate-50 dark:bg-slate-950 rounded-xl border border-slate-200 dark:border-slate-800 focus:ring-2 focus:ring-indigo-500 font-semibold" value={formData.cin} onChange={e => setFormData({...formData, cin: e.target.value})} />
+                          <input type="text" className={cn("w-full px-4 py-3 bg-slate-50 dark:bg-slate-950 rounded-xl border border-slate-200 dark:border-slate-800 focus:ring-2 focus:ring-indigo-500 font-semibold", formData.isUnknown && "text-slate-400 bg-slate-100/50 dark:bg-slate-900/50")} value={formData.cin} onChange={e => setFormData({...formData, cin: e.target.value})} disabled={formData.isUnknown} />
                         </div>
                         <div>
                           <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5">Numéro de dossier</label>

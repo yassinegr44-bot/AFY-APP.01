@@ -28,7 +28,7 @@ export function DeceasedList({ data, onSelectDeceased, onNavigate }: DeceasedLis
     if (filter === 'in_facility') matchesFilter = d.status === 'in_facility';
     if (filter === 'released') matchesFilter = d.status === 'released';
     if (filter === 'urgent') {
-      const diff = differenceInDays(new Date(), d.admissionDate.toDate());
+      const diff = d.admissionDate ? differenceInDays(new Date(), d.admissionDate.toDate()) : 0;
       matchesFilter = d.status === 'in_facility' && (diff >= settings.alertThresholdDays || d.isUnknown);
     }
     
@@ -108,7 +108,7 @@ export function DeceasedList({ data, onSelectDeceased, onNavigate }: DeceasedLis
               </tr>
             ) : (
               filtered.map((record: DeceasedRecord) => {
-                const diff = differenceInDays(new Date(), record.admissionDate.toDate());
+                const diff = record.admissionDate ? differenceInDays(new Date(), record.admissionDate.toDate()) : 0;
                 const isUrgent = record.status === 'in_facility' && (diff >= settings.alertThresholdDays || record.isUnknown);
                 const isApproaching = record.status === 'in_facility' && !isUrgent && diff >= settings.alertThresholdDays - 3;
                 const isPending = record.syncStatus === 'pending' || !record.refNumber;
@@ -174,17 +174,22 @@ export function DeceasedList({ data, onSelectDeceased, onNavigate }: DeceasedLis
                     </td>
                     <td className="px-6 py-5">
                       <span className="text-sm font-bold text-slate-700 dark:text-slate-300">
-                        {format(record.admissionDate.toDate(), 'dd/MM/yyyy')}
+                        {record.admissionDate ? format(record.admissionDate.toDate(), 'dd/MM/yyyy') : 'Non renseigné'}
                       </span>
                     </td>
                     <td className="px-6 py-5">
                       <div className="flex items-center gap-1.5 text-slate-500 dark:text-slate-400 font-bold text-xs">
                         <Clock size={12} className="text-slate-300 dark:text-slate-700" />
-                        {record.admissionTime}
+                        {record.isHistorical ? 'X' : record.admissionTime}
                       </div>
                     </td>
                     <td className="px-6 py-5">
-                      {record.fridgePosition && record.fridgePosition !== -1 ? (
+                      {record.isHistorical || record.fridgePosition === 999 || record.fridgePosition === 'X' ? (
+                        <div className="inline-flex items-center gap-2 px-3 py-1 rounded-lg text-xs font-black bg-slate-50 dark:bg-slate-800 text-slate-600 dark:text-slate-300 border border-slate-100 dark:border-slate-700">
+                          <Refrigerator size={12} />
+                          X
+                        </div>
+                      ) : record.fridgePosition && record.fridgePosition !== -1 ? (
                         <div className={cn(
                           "inline-flex items-center gap-2 px-3 py-1 rounded-lg text-xs font-black",
                           isUrgent ? "bg-red-50 dark:bg-red-900/30 text-red-600 dark:text-red-400 border border-red-100 dark:border-red-900/30" : 

@@ -27,9 +27,11 @@ export function Statistics({ data, onNavigate }: StatisticsProps) {
   const chartsRef = useRef<HTMLDivElement>(null);
 
   const inFacilityCount = deceased.filter((d: any) => d.status === 'in_facility').length;
-  const releasedCount = deceased.filter((d: any) => d.status === 'released').length;
   const unknownCount = deceased.filter((d: any) => d.isUnknown).length;
   const amputeesCount = amputees.length;
+
+  const releasedRecords = deceased.filter((d: any) => d.status === 'released' || d.isHistorical);
+  const releasedCount = releasedRecords.length;
 
   const foetusCount = deceased.filter((d: any) => d.caseType === 'FŒTUS').length;
   const mortNeCount = deceased.filter((d: any) => d.caseType === 'MORT_NÉ').length;
@@ -44,9 +46,8 @@ export function Statistics({ data, onNavigate }: StatisticsProps) {
     { name: 'Libérés', value: releasedCount, color: '#cbd5e1' }
   ];
 
-  const releasedRecords = deceased.filter((d: any) => d.status === 'released' || d.isHistorical);
   const priseFamilleCount = releasedRecords.filter((d: any) => d.takingChargeType === 'Famille').length;
-  const priseAutreCount = releasedRecords.filter((d: any) => d.takingChargeType && d.takingChargeType !== 'Famille').length; // Includes Association and Autre
+  const priseAutreCount = releasedCount - priseFamilleCount; // Includes everything not Famille
   
   const priseEnChargeData = [
     { name: 'Famille', value: priseFamilleCount, color: '#006050' },
@@ -59,8 +60,8 @@ export function Statistics({ data, onNavigate }: StatisticsProps) {
     const dateStr = d.toDateString();
     return {
       name: format(d, 'EEE', { locale: fr }),
-      admissions: deceased.filter((rec: any) => rec.admissionDate.toDate().toDateString() === dateStr).length,
-      sorties: deceased.filter((rec: any) => rec.exitDate?.toDate().toDateString() === dateStr).length,
+      admissions: deceased.filter((rec: any) => rec.admissionDate && rec.admissionDate.toDate().toDateString() === dateStr).length,
+      sorties: deceased.filter((rec: any) => rec.exitDate && rec.exitDate.toDate().toDateString() === dateStr).length,
     };
   }).reverse();
 

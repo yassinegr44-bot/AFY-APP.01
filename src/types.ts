@@ -83,7 +83,7 @@ export interface DeceasedRecord {
   originDetail?: string;
   admissionDate: Timestamp;
   admissionTime: string;
-  fridgePosition: number;
+  fridgePosition: number | 'X';
   fridgeNumber?: number;
   status: DeceasedStatus;
   isUnknown?: boolean;

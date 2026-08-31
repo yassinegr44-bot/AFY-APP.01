@@ -16,8 +16,12 @@ export function ArchiveView({ data, onNavigate, onSelectDeceased }: ArchiveViewP
 
   const filteredDeceased = deceased.filter((d: DeceasedRecord) => 
     d.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
-    d.refNumber.toLowerCase().includes(searchTerm.toLowerCase())
-  ).sort((a: DeceasedRecord, b: DeceasedRecord) => b.admissionDate.toMillis() - a.admissionDate.toMillis());
+    (d.refNumber && d.refNumber.toLowerCase().includes(searchTerm.toLowerCase()))
+  ).sort((a: DeceasedRecord, b: DeceasedRecord) => {
+    const timeA = a.admissionDate ? a.admissionDate.toMillis() : 0;
+    const timeB = b.admissionDate ? b.admissionDate.toMillis() : 0;
+    return timeB - timeA;
+  });
 
   const handleQuickDownload = () => {
     setIsExporting(true);
@@ -92,7 +96,7 @@ export function ArchiveView({ data, onNavigate, onSelectDeceased }: ArchiveViewP
                 <td className="px-6 py-4 font-bold text-slate-800 dark:text-slate-100">#{d.refNumber}</td>
                 <td className="px-6 py-4 text-slate-700 dark:text-slate-300 font-medium">{d.name}</td>
                 <td className="px-6 py-4 text-slate-500">
-                  {d.fridgePosition && d.fridgePosition !== -1 
+                  {d.isHistorical || d.fridgePosition === 999 || d.fridgePosition === 'X' ? 'X' : d.fridgePosition && d.fridgePosition !== -1 
                     ? `FRIGO-${d.fridgePosition.toString().padStart(2, '0')}` 
                     : 'Frigo Inconnu'}
                 </td>

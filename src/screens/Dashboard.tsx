@@ -34,6 +34,7 @@ export function Dashboard({ data, onNavigate, onSelectDeceased }: DashboardProps
   
   const inFacility = deceased.filter((d: DeceasedRecord) => d.status === 'in_facility');
   const todayAdmissions = deceased.filter((d: DeceasedRecord) => {
+    if (!d.admissionDate) return false;
     const dDate = d.admissionDate.toDate();
     const today = new Date();
     return dDate.toDateString() === today.toDateString();
