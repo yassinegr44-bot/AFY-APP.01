@@ -26,7 +26,7 @@ import { formatDate } from '../lib/utils';
 import { DeceasedRecord, TimelineEvent, AppUser } from '../types';
 import { differenceInDays, format, formatDistance } from 'date-fns';
 import { fr } from 'date-fns/locale';
-import { cn } from '../lib/utils';
+import { cn, safeDate } from '../lib/utils';
 import { generateSingleDossierPDF } from '../utils/pdf';
 import { formatOperatorName } from '../utils/userUtils';
 import { useAuth } from '../context/AuthContext';
@@ -141,10 +141,10 @@ export function DeceasedDetail({ record, users, onBack, onExit, onUpdateIdentity
 
   const isReleased = record.status === 'released';
   const isPending = record.syncStatus === 'pending' || !record.refNumber;
-  const admissionDate = record.admissionDate ? record.admissionDate.toDate() : new Date();
-  const exitDate = isReleased && record.exitDate ? record.exitDate.toDate() : new Date();
-  const diff = record.admissionDate ? differenceInDays(exitDate, admissionDate) : 0;
-  const durationText = record.admissionDate ? formatDistance(admissionDate, exitDate, { locale: fr, addSuffix: false }) : 'N/A';
+  const admissionDate = safeDate(record.admissionDate) || new Date();
+  const exitDate = isReleased && record.exitDate ? (safeDate(record.exitDate) || new Date()) : new Date();
+  const diff = safeDate(record.admissionDate) ? differenceInDays(exitDate, admissionDate) : 0;
+  const durationText = safeDate(record.admissionDate) ? formatDistance(admissionDate, exitDate, { locale: fr, addSuffix: false }) : 'N/A';
   
   // Use a fixed 15-day threshold for consistent UI or pass from data
   const threshold = 15; 
@@ -266,7 +266,10 @@ export function DeceasedDetail({ record, users, onBack, onExit, onUpdateIdentity
 
       {/* Quick Stats Grid */}
       <div className="grid grid-cols-3 gap-3">
-        <StatCard label="Admission" value={record.admissionDate ? format(record.admissionDate.toDate(), 'dd MMM') : 'N/A'} icon={Calendar} color="blue" />
+        <StatCard label="Admission" value={(() => {
+          const dDate = safeDate(record.admissionDate);
+          return dDate ? format(dDate, 'dd MMM') : 'N/A';
+        })()} icon={Calendar} color="blue" />
         <StatCard label="Position" value={record.isHistorical || record.fridgePosition === 999 || record.fridgePosition === 'X' ? 'X' : record.fridgePosition && record.fridgePosition !== -1 ? `Frigo ${record.fridgePosition.toString().padStart(2, '0')}` : 'Frigo Inconnu'} icon={Refrigerator} color="emerald" />
         <StatCard label="Durée Totale" value={`${diff} Jours`} icon={Clock} color={isUrgent ? "red" : isApproaching ? "orange" : "blue"} />
       </div>
@@ -293,11 +296,21 @@ export function DeceasedDetail({ record, users, onBack, onExit, onUpdateIdentity
                 <div>
                   <div className="flex items-center justify-between mb-1">
                     <p className="text-xs font-black text-slate-800 dark:text-slate-100 uppercase tracking-tight">{event.title}</p>
-                    <time className="text-[10px] font-bold text-slate-400">{format(event.timestamp.toDate(), 'HH:mm', { locale: fr })}</time>
+                    <time className="text-[10px] font-bold text-slate-400">
+                      {(() => {
+                        const d = safeDate(event.timestamp);
+                        return d ? format(d, 'HH:mm', { locale: fr }) : '-';
+                      })()}
+                    </time>
                   </div>
                   <p className="text-[11px] font-medium text-slate-500 dark:text-slate-400 leading-relaxed">{event.description}</p>
                   <div className="flex items-center justify-between mt-2">
-                    <p className="text-[9px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest">{format(event.timestamp.toDate(), 'dd MMMM yyyy', { locale: fr })}</p>
+                    <p className="text-[9px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest">
+                      {(() => {
+                        const d = safeDate(event.timestamp);
+                        return d ? format(d, 'dd MMMM yyyy', { locale: fr }) : '-';
+                      })()}
+                    </p>
                     <p className="text-[9px] font-bold text-slate-500 dark:text-slate-400 bg-slate-100 dark:bg-slate-800 px-2 py-0.5 rounded-full">
                       Opérateur : {formatOperatorName(event.createdBy, users, activeOperatorName)}
                     </p>
@@ -336,7 +349,10 @@ export function DeceasedDetail({ record, users, onBack, onExit, onUpdateIdentity
         <DetailSection title="Circonstances" icon={Stethoscope}>
           <DetailRow label="Cause suspectée" value={record.cause || 'Non spécifiée'} />
           <DetailRow label="Lieu / Origine" value={record.origin || 'Non renseigné'} />
-          <DetailRow label="Date de décès" value={format(record.dateOfDeath.toDate(), 'dd/MM/yyyy')} />
+          <DetailRow label="Date de décès" value={(() => {
+            const d = safeDate(record.dateOfDeath);
+            return d ? format(d, 'dd/MM/yyyy') : 'Non renseignée';
+          })()} />
           <DetailRow label="Heure" value={record.timeOfDeath} />
         </DetailSection>
 
@@ -350,10 +366,16 @@ export function DeceasedDetail({ record, users, onBack, onExit, onUpdateIdentity
                 ? 'Frigo 11 (Médico-Légal)'
                 : `Frigo ${record.fridgeNumber || record.fridgePosition}`
           } highlight />
-          <DetailRow label="Date Admission" value={record.admissionDate ? format(record.admissionDate.toDate(), 'dd/MM/yyyy HH:mm') : 'Non renseignée'} />
+          <DetailRow label="Date Admission" value={(() => {
+            const d = safeDate(record.admissionDate);
+            return d ? format(d, 'dd/MM/yyyy HH:mm') : 'Non renseignée';
+          })()} />
           {isReleased && record.exitDate && (
             <div className="mt-4 pt-4 border-t border-slate-100 dark:border-slate-800 space-y-2">
-              <DetailRow label="Date de Sortie" value={format(record.exitDate.toDate(), 'dd/MM/yyyy HH:mm')} highlight />
+              <DetailRow label="Date de Sortie" value={(() => {
+                const d = safeDate(record.exitDate);
+                return d ? format(d, 'dd/MM/yyyy HH:mm') : 'Non renseignée';
+              })()} highlight />
               {record.transportMethod && <DetailRow label="Moyen de transport" value={record.transportMethod} />}
               {record.ambulanceNumber && <DetailRow label="N° Ambulance" value={record.ambulanceNumber} />}
               {record.takingChargeType && <DetailRow label="Prise en charge" value={record.takingChargeType} />}

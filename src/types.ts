@@ -139,3 +139,8 @@ export interface FridgePosition {
 export interface AppSettings {
   alertThresholdDays: number;
 }
+
+export interface ReportConfig {
+  startDate: string;
+  endDate: string;
+}

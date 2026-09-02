@@ -1,3 +1,4 @@
+import { safeDate } from '../lib/utils';
 import { useState, useEffect } from 'react';
 import { 
   Plus, Search, Calendar, ArrowLeft, CheckCircle2, ChevronRight, User, FileText, Edit, MapPin, Eye, Trash2, Activity, Truck
@@ -59,12 +60,12 @@ export function HistoricalDeceased({ data, onNavigate }: HistoricalDeceasedProps
   // Filtered List
   const filteredRecords = historicalDeceased.filter((rec: DeceasedRecord) => {
     const matchesSearch = 
-      rec.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
+      (rec.name && rec.name.toLowerCase().includes(searchTerm.toLowerCase())) || 
       (rec.refNumber || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
       (rec.cause && rec.cause.toLowerCase().includes(searchTerm.toLowerCase()));
 
     if (startDate || endDate) {
-      const recDate = rec.dateOfDeath?.toDate ? rec.dateOfDeath.toDate() : (rec.dateOfDeath && typeof rec.dateOfDeath !== 'object' ? new Date(rec.dateOfDeath) : null);
+      const recDate = safeDate(rec.dateOfDeath);
       if (recDate) {
         const recDateStr = recDate.toISOString().split('T')[0];
         if (startDate && recDateStr < startDate) return false;
@@ -133,11 +134,11 @@ export function HistoricalDeceased({ data, onNavigate }: HistoricalDeceasedProps
       gender: record.gender || 'Indéterminé',
       age: record.age?.toString() || '',
       ageUnit: record.ageUnit || 'Années',
-      dateOfDeath: record.dateOfDeath?.toDate ? record.dateOfDeath.toDate().toISOString().split('T')[0] : (typeof record.dateOfDeath === 'string' ? record.dateOfDeath : ''),
+      dateOfDeath: safeDate(record.dateOfDeath)?.toISOString().split('T')[0] || '',
       natureOfDeath: record.natureOfDeath || 'Normal',
       cause: record.cause || 'Naturelle',
-      admissionDate: record.admissionDate?.toDate ? record.admissionDate.toDate().toISOString().split('T')[0] : (typeof record.admissionDate === 'string' ? record.admissionDate : ''),
-      exitDate: record.exitDate?.toDate ? record.exitDate.toDate().toISOString().split('T')[0] : (typeof record.exitDate === 'string' ? record.exitDate : ''),
+      admissionDate: safeDate(record.admissionDate)?.toISOString().split('T')[0] || '',
+      exitDate: safeDate(record.exitDate)?.toISOString().split('T')[0] || '',
       exitType: record.exitType || 'Inhumation',
       takingChargeType: record.takingChargeType || '',
       takingChargeCin: record.takingChargeCin || '',
@@ -358,7 +359,10 @@ export function HistoricalDeceased({ data, onNavigate }: HistoricalDeceasedProps
                       </td>
                       <td className="py-4 px-6">
                         <span className="text-sm font-semibold text-slate-600 dark:text-slate-300">
-                          {record.dateOfDeath?.toDate ? record.dateOfDeath.toDate().toLocaleDateString('fr-FR') : (typeof record.dateOfDeath === 'string' ? record.dateOfDeath : '-')}
+                          {(() => {
+                            const dDate = safeDate(record.dateOfDeath);
+                            return dDate ? dDate.toLocaleDateString('fr-FR') : '-';
+                          })()}
                         </span>
                       </td>
                       <td className="py-4 px-6">
@@ -658,7 +662,10 @@ export function HistoricalDeceased({ data, onNavigate }: HistoricalDeceasedProps
                   <Activity className="w-4 h-4" /> Décès
                 </h3>
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
-                  <DetailRow label="Date de décès" value={selectedRecord.dateOfDeath?.toDate ? selectedRecord.dateOfDeath.toDate().toLocaleDateString('fr-FR') : (typeof selectedRecord.dateOfDeath === 'string' ? selectedRecord.dateOfDeath : undefined)} />
+                  <DetailRow label="Date de décès" value={(() => {
+                    const d = safeDate(selectedRecord.dateOfDeath);
+                    return d ? d.toLocaleDateString('fr-FR') : undefined;
+                  })()} />
                   <DetailRow label="Nature du décès" value={selectedRecord.natureOfDeath} />
                   <DetailRow label="Cause du décès" value={selectedRecord.cause} />
                 </div>
@@ -669,8 +676,14 @@ export function HistoricalDeceased({ data, onNavigate }: HistoricalDeceasedProps
                   <MapPin className="w-4 h-4" /> Admission & Sortie
                 </h3>
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-6 mb-6">
-                  <DetailRow label="Date d'admission" value={selectedRecord.admissionDate?.toDate ? selectedRecord.admissionDate.toDate().toLocaleDateString('fr-FR') : (typeof selectedRecord.admissionDate === 'string' ? selectedRecord.admissionDate : undefined)} />
-                  <DetailRow label="Date de sortie" value={selectedRecord.exitDate?.toDate ? selectedRecord.exitDate.toDate().toLocaleDateString('fr-FR') : (typeof selectedRecord.exitDate === 'string' ? selectedRecord.exitDate : undefined)} />
+                  <DetailRow label="Date d'admission" value={(() => {
+                    const d = safeDate(selectedRecord.admissionDate);
+                    return d ? d.toLocaleDateString('fr-FR') : undefined;
+                  })()} />
+                  <DetailRow label="Date de sortie" value={(() => {
+                    const d = safeDate(selectedRecord.exitDate);
+                    return d ? d.toLocaleDateString('fr-FR') : undefined;
+                  })()} />
                   <DetailRow label="Type de sortie" value={selectedRecord.exitType} />
                 </div>
                 

@@ -1,9 +1,10 @@
 import { jsPDF } from 'jspdf';
 import autoTable from 'jspdf-autotable';
-import { format } from 'date-fns';
+import { format, differenceInDays } from 'date-fns';
 import { fr } from 'date-fns/locale';
-import { DeceasedRecord, AppUser } from '../types';
+import { DeceasedRecord, AppUser, ReportConfig } from '../types';
 import { formatOperatorName } from './userUtils';
+import { safeDate } from '../lib/utils';
 import moroccoCoatOfArms from '../assets/images/morocco_coat_of_arms_1787413407773.jpg';
 import afyLogo from '../assets/images/afy_app_logo_badge_1787413982578.jpg';
 
@@ -149,12 +150,14 @@ const drawOfficialHeader = (doc: jsPDF, reportTitle: string) => {
   doc.line(leftMargin, 43, rightMargin, 43);
 };
 
-export const generateStatisticsPDF = async (data: any) => {
+export const generateStatisticsPDF = async (data: any, config?: ReportConfig) => {
   await ensureImagesLoaded();
-  const deceased = data?.deceased || [];
+  const deceased: DeceasedRecord[] = data?.deceased || [];
   const amputees = data?.amputees || [];
+  
   const inFacilityCount = deceased.filter((d: any) => d.status === 'in_facility').length;
-  const releasedCount = deceased.filter((d: any) => d.status === 'released').length;
+  const releasedRecords = deceased.filter((d: any) => d.status === 'released' || d.isHistorical);
+  const releasedCount = releasedRecords.length;
   const unknownCount = deceased.filter((d: any) => d.isUnknown).length;
 
   const doc = new jsPDF();
@@ -162,26 +165,37 @@ export const generateStatisticsPDF = async (data: any) => {
   const pageHeight = doc.internal.pageSize.getHeight();
 
   // ================= EN-TÊTE PAGE 1 =================
-  drawOfficialHeader(doc, "RAPPORT : RAPPORT STATISTIQUE ET D'ACTIVITÉ DES DOSSIERS DE DÉCÈS");
+  const reportTitle = config?.startDate || config?.endDate
+    ? "RAPPORT : ANALYSE STATISTIQUE PÉRIODIQUE DES DÉCÈS"
+    : "RAPPORT : ANALYSE STATISTIQUE GLOBALE DES DÉCÈS";
+    
+  drawOfficialHeader(doc, reportTitle);
 
   doc.setFontSize(8.5);
   doc.setFont('helvetica', 'normal');
   doc.setTextColor(...COLOR_MUTED_TEXT);
-  doc.text(`Période couverte : Jusqu'au ${format(new Date(), 'dd/MM/yyyy')}`, 14, 47);
+  
+  const periodStr = config?.startDate || config?.endDate
+    ? `Période du : ${config.startDate ? format(new Date(config.startDate), 'dd/MM/yyyy') : 'Origine'} au ${config.endDate ? format(new Date(config.endDate), 'dd/MM/yyyy') : 'Ce jour'}`
+    : `Période couverte : Jusqu'au ${format(new Date(), 'dd/MM/yyyy')}`;
+
+  doc.text(periodStr, 14, 47);
   doc.text(`Généré le ${format(new Date(), "dd/MM/yyyy 'à' HH:mm", { locale: fr })}`, pageWidth - 14, 47, { align: 'right' });
 
   doc.setDrawColor(...COLOR_BORDER);
   doc.setLineWidth(0.5);
   doc.line(14, 50, pageWidth - 14, 50);
 
+  let currentY = 58;
+
   // ================= 1. RÉSUMÉ GLOBAL =================
-  doc.setFontSize(12);
+  doc.setFontSize(11);
   doc.setFont('helvetica', 'bold');
   doc.setTextColor(...COLOR_SECONDARY);
-  doc.text("1. RÉSUMÉ GLOBAL DES ADMISSIONS", 14, 58);
+  doc.text("1. RÉSUMÉ GLOBAL DES ADMISSIONS", 14, currentY);
 
   autoTable(doc, {
-    startY: 61,
+    startY: currentY + 3,
     head: [['Indicateur Clé', 'Nombre / Effectif', 'Pourcentage']],
     body: [
       ['Total des Admissions enregistrées', deceased.length.toString(), '100%'],
@@ -190,171 +204,238 @@ export const generateStatisticsPDF = async (data: any) => {
       ['Dossiers avec Identité Inconnue (X)', unknownCount.toString(), deceased.length > 0 ? `${Math.round((unknownCount / deceased.length) * 100)}%` : '0%'],
     ],
     theme: 'striped',
-    headStyles: {
-      fillColor: COLOR_PRIMARY,
-      textColor: COLOR_WHITE,
-      fontStyle: 'bold',
-      fontSize: 9,
-    },
-    styles: {
-      textColor: COLOR_DARK_TEXT,
-      fontSize: 8.5,
-      cellPadding: 4,
-    },
-    alternateRowStyles: {
-      fillColor: COLOR_ROW_ALT,
-    },
+    headStyles: { fillColor: COLOR_PRIMARY, textColor: COLOR_WHITE, fontStyle: 'bold', fontSize: 8.5 },
+    styles: { textColor: COLOR_DARK_TEXT, fontSize: 8, cellPadding: 3 },
+    alternateRowStyles: { fillColor: COLOR_ROW_ALT },
     margin: { left: 14, right: 14 },
   });
+  currentY = (doc as any).lastAutoTable.finalY + 10;
 
-  let currentY = (doc as any).lastAutoTable.finalY + 12;
-
-  // ================= 2. ANOMALIES & POINTS D'ATTENTION =================
-  doc.setFontSize(13);
+  // ================= 2. RÉPARTITION PAR CAUSE =================
+  if (currentY > pageHeight - 60) { doc.addPage(); currentY = 20; }
+  doc.setFontSize(11);
   doc.setFont('helvetica', 'bold');
   doc.setTextColor(...COLOR_SECONDARY);
-  doc.text("2. ANOMALIES ET POINTS DE VIGILANCE", 14, currentY);
+  doc.text("2. RÉPARTITION DES DÉCÈS PAR CAUSE SUSPECTÉE", 14, currentY);
 
-  const anomalies: string[] = [];
-  if (unknownCount > 0) anomalies.push(`- ${unknownCount} dossier(s) sont répertoriés avec une identité non identifiée (X).`);
-  
-  const longStayCount = deceased.filter((d: any) => {
-    if (d.status === 'in_facility' && d.admissionDate) {
-      const days = Math.floor((new Date().getTime() - d.admissionDate.toDate().getTime()) / (1000 * 3600 * 24));
-      return days > 30;
-    }
-    return false;
-  }).length;
+  const causeStats: Record<string, number> = {};
+  deceased.forEach(d => {
+    const cause = d.cause || 'Non spécifiée';
+    causeStats[cause] = (causeStats[cause] || 0) + 1;
+  });
 
-  if (longStayCount > 0) {
-    anomalies.push(`- ${longStayCount} corps présent(s) depuis plus de 30 jours dans la morgue.`);
-  }
-
-  const anomalyRows = anomalies.length > 0 
-    ? anomalies.map(a => [a])
-    : [['Aucune anomalie critique détectée sur l\'ensemble des dossiers actifs.']];
+  const causeRows = Object.entries(causeStats)
+    .sort((a, b) => b[1] - a[1])
+    .map(([cause, count]) => [cause, count.toString(), deceased.length > 0 ? `${Math.round((count / deceased.length) * 100)}%` : '0%']);
 
   autoTable(doc, {
-    startY: currentY + 4,
-    head: [['Observations et Alertes Opérationnelles']],
-    body: anomalyRows,
+    startY: currentY + 3,
+    head: [['Cause Suspectée', 'Nombre', 'Pourcentage']],
+    body: causeRows.length > 0 ? causeRows : [['Aucune donnée', '0', '0%']],
     theme: 'grid',
-    headStyles: {
-      fillColor: COLOR_SECONDARY,
-      textColor: COLOR_WHITE,
-      fontStyle: 'bold',
-      fontSize: 9,
-    },
-    styles: {
-      textColor: COLOR_DARK_TEXT,
-      fontSize: 8.5,
-      cellPadding: 4,
-    },
+    headStyles: { fillColor: COLOR_SECONDARY, textColor: COLOR_WHITE, fontSize: 8.5 },
+    styles: { fontSize: 8, cellPadding: 3 },
     margin: { left: 14, right: 14 },
   });
+  currentY = (doc as any).lastAutoTable.finalY + 10;
 
-  // ================= 3. REGISTRE DES AMPUTÉS =================
-  doc.addPage();
-  doc.setFontSize(13);
+  // ================= 3. RÉPARTITION PAR GENRE =================
+  if (currentY > pageHeight - 60) { doc.addPage(); currentY = 20; }
+  doc.setFontSize(11);
   doc.setFont('helvetica', 'bold');
   doc.setTextColor(...COLOR_SECONDARY);
-  doc.text("3. REGISTRE DES PIÈCES ANATOMIQUES & AMPUTATIONS", 14, 20);
+  doc.text("3. RÉPARTITION PAR GENRE", 14, currentY);
 
-  const amputeeTableData = (amputees || []).map((a: any) => [
-    `#${a.refNumber || 'N/A'}`,
-    `${a.firstName || ''} ${a.name || ''}`.trim() || 'Non renseigné',
-    a.bodyParts ? a.bodyParts.join(', ') : '—',
-    a.cause || '—',
-    a.amputationDateTime ? format(a.amputationDateTime.toDate(), 'dd/MM/yyyy HH:mm', { locale: fr }) : 'Non renseigné'
+  const genderStats: Record<string, number> = { 'Masculin': 0, 'Féminin': 0, 'Autre': 0 };
+  deceased.forEach(d => {
+    if (d.gender) genderStats[d.gender] = (genderStats[d.gender] || 0) + 1;
+  });
+
+  autoTable(doc, {
+    startY: currentY + 3,
+    head: [['Genre', 'Effectif', 'Pourcentage']],
+    body: Object.entries(genderStats).map(([g, c]) => [g, c.toString(), deceased.length > 0 ? `${Math.round((c / deceased.length) * 100)}%` : '0%']),
+    theme: 'striped',
+    headStyles: { fillColor: COLOR_PRIMARY, textColor: COLOR_WHITE, fontSize: 8.5 },
+    styles: { fontSize: 8, cellPadding: 3 },
+    margin: { left: 14, right: 14 },
+  });
+  currentY = (doc as any).lastAutoTable.finalY + 10;
+
+  // ================= 4. RÉPARTITION PAR ÂGE =================
+  if (currentY > pageHeight - 60) { doc.addPage(); currentY = 20; }
+  doc.setFontSize(11);
+  doc.setFont('helvetica', 'bold');
+  doc.setTextColor(...COLOR_SECONDARY);
+  doc.text("4. RÉPARTITION PAR TRANCHE D'ÂGE", 14, currentY);
+
+  const ageGroups = {
+    'Fœtus / Mort-né': 0,
+    '0 - 1 an': 0,
+    '1 - 18 ans': 0,
+    '18 - 40 ans': 0,
+    '40 - 65 ans': 0,
+    '65+ ans': 0,
+    'Non renseigné': 0
+  };
+
+  deceased.forEach(d => {
+    if (d.caseType === 'FŒTUS' || d.caseType === 'MORT_NÉ') ageGroups['Fœtus / Mort-né']++;
+    else if (d.caseType === 'ENFANT_MOINS_1_AN') ageGroups['0 - 1 an']++;
+    else if (d.age !== undefined) {
+      if (d.age < 18) ageGroups['1 - 18 ans']++;
+      else if (d.age < 40) ageGroups['18 - 40 ans']++;
+      else if (d.age < 65) ageGroups['40 - 65 ans']++;
+      else ageGroups['65+ ans']++;
+    } else {
+      ageGroups['Non renseigné']++;
+    }
+  });
+
+  autoTable(doc, {
+    startY: currentY + 3,
+    head: [['Tranche d\'âge', 'Effectif', 'Pourcentage']],
+    body: Object.entries(ageGroups).map(([g, c]) => [g, c.toString(), deceased.length > 0 ? `${Math.round((c / deceased.length) * 100)}%` : '0%']),
+    theme: 'grid',
+    headStyles: { fillColor: COLOR_SECONDARY, textColor: COLOR_WHITE, fontSize: 8.5 },
+    styles: { fontSize: 8, cellPadding: 3 },
+    margin: { left: 14, right: 14 },
+  });
+  currentY = (doc as any).lastAutoTable.finalY + 10;
+
+  // ================= 5. DURÉE DE SÉJOUR =================
+  if (currentY > pageHeight - 60) { doc.addPage(); currentY = 20; }
+  doc.setFontSize(11);
+  doc.setFont('helvetica', 'bold');
+  doc.setTextColor(...COLOR_SECONDARY);
+  doc.text("5. ANALYSE DE LA DURÉE DE SÉJOUR (Sorties)", 14, currentY);
+
+  const stays = releasedRecords
+    .map(d => {
+      const start = safeDate(d.admissionDate);
+      const end = safeDate(d.exitDate);
+      return (start && end) ? differenceInDays(end, start) : null;
+    })
+    .filter((s): s is number => s !== null);
+
+  const avgStay = stays.length > 0 ? (stays.reduce((a, b) => a + b, 0) / stays.length).toFixed(1) : '—';
+  const maxStay = stays.length > 0 ? Math.max(...stays) : '—';
+
+  autoTable(doc, {
+    startY: currentY + 3,
+    body: [
+      ['Nombre de dossiers analysés (Sortis)', stays.length.toString()],
+      ['Durée moyenne de séjour (Jours)', `${avgStay} jours`],
+      ['Durée maximale constatée (Jours)', `${maxStay} jours`],
+    ],
+    theme: 'plain',
+    styles: { fontSize: 9, cellPadding: 4, fontStyle: 'bold' },
+    columnStyles: { 0: { cellWidth: 100 } },
+    margin: { left: 14, right: 14 },
+  });
+  currentY = (doc as any).lastAutoTable.finalY + 10;
+
+  // ================= 6. SÉJOURS PROLONGÉS (ALERTES) =================
+  if (currentY > pageHeight - 60) { doc.addPage(); currentY = 20; }
+  doc.setFontSize(11);
+  doc.setFont('helvetica', 'bold');
+  doc.setTextColor(...COLOR_SECONDARY);
+  doc.text("6. DOSSIERS EN SÉJOUR PROLONGÉ (> 15 JOURS)", 14, currentY);
+
+  const longStays = deceased
+    .filter(d => {
+      if (d.status !== 'in_facility') return false;
+      const adm = safeDate(d.admissionDate);
+      return adm && differenceInDays(new Date(), adm) >= 15;
+    })
+    .map(d => {
+      const adm = safeDate(d.admissionDate);
+      const days = adm ? differenceInDays(new Date(), adm) : 0;
+      return [d.refNumber || '—', d.name || 'Identité Inconnue', format(adm!, 'dd/MM/yyyy'), `${days} jours`];
+    });
+
+  autoTable(doc, {
+    startY: currentY + 3,
+    head: [['Réf', 'Nom', 'Date Admission', 'Durée actuelle']],
+    body: longStays.length > 0 ? longStays : [['Aucun dossier en séjour prolongé actuellement.', '', '', '']],
+    theme: 'grid',
+    headStyles: { fillColor: [185, 28, 28], textColor: COLOR_WHITE, fontSize: 8.5 },
+    styles: { fontSize: 8, cellPadding: 3 },
+    margin: { left: 14, right: 14 },
+  });
+  currentY = (doc as any).lastAutoTable.finalY + 10;
+
+  // ================= 7. SORTIES & PRISE EN CHARGE =================
+  if (currentY > pageHeight - 60) { doc.addPage(); currentY = 20; }
+  doc.setFontSize(11);
+  doc.setFont('helvetica', 'bold');
+  doc.setTextColor(...COLOR_SECONDARY);
+  doc.text("7. ANALYSE DES SORTIES ET PRISES EN CHARGE", 14, currentY);
+
+  const exitStats: Record<string, number> = { 'Famille': 0, 'Association': 0, 'Autre': 0 };
+  releasedRecords.forEach(d => {
+    const type = d.takingChargeType || 'Autre';
+    exitStats[type] = (exitStats[type] || 0) + 1;
+  });
+
+  autoTable(doc, {
+    startY: currentY + 3,
+    head: [['Type de Prise en Charge', 'Nombre', 'Pourcentage']],
+    body: Object.entries(exitStats).map(([t, c]) => [t, c.toString(), releasedCount > 0 ? `${Math.round((c / releasedCount) * 100)}%` : '0%']),
+    theme: 'striped',
+    headStyles: { fillColor: COLOR_PRIMARY, textColor: COLOR_WHITE, fontSize: 8.5 },
+    styles: { fontSize: 8, cellPadding: 3 },
+    margin: { left: 14, right: 14 },
+  });
+  currentY = (doc as any).lastAutoTable.finalY + 10;
+
+  // ================= 8. OCCUPATION FRIGOS =================
+  if (currentY > pageHeight - 60) { doc.addPage(); currentY = 20; }
+  doc.setFontSize(11);
+  doc.setFont('helvetica', 'bold');
+  doc.setTextColor(...COLOR_SECONDARY);
+  doc.text("8. ÉTAT D'OCCUPATION DES FRIGOS", 14, currentY);
+
+  const fridgePositions = data?.fridge || [];
+  const occupied = fridgePositions.filter((p: any) => p.status === 'occupied').length;
+  const total = fridgePositions.length;
+
+  autoTable(doc, {
+    startY: currentY + 3,
+    body: [
+      ['Taux d\'occupation global', `${occupied} / ${total} places (${total > 0 ? Math.round((occupied/total)*100) : 0}%)`],
+      ['Unités disponibles', (total - occupied).toString()],
+    ],
+    theme: 'plain',
+    styles: { fontSize: 9, cellPadding: 4, fontStyle: 'bold' },
+    margin: { left: 14, right: 14 },
+  });
+  currentY = (doc as any).lastAutoTable.finalY + 10;
+
+  // ================= 9. AMPUTÉS =================
+  if (currentY > pageHeight - 60) { doc.addPage(); currentY = 20; }
+  doc.setFontSize(11);
+  doc.setFont('helvetica', 'bold');
+  doc.setTextColor(...COLOR_SECONDARY);
+  doc.text("9. REGISTRE DES AMPUTÉS", 14, currentY);
+
+  const ampRows = amputees.map((a: any) => [
+    `#${a.refNumber || '—'}`,
+    `${a.firstName || ''} ${a.name || ''}`.trim() || '—',
+    a.bodyParts?.join(', ') || '—',
+    safeDate(a.amputationDateTime) ? format(safeDate(a.amputationDateTime)!, 'dd/MM/yyyy') : '—'
   ]);
 
-  if (amputeeTableData.length > 0) {
-    autoTable(doc, {
-      startY: 25,
-      head: [['Réf', 'Nom du Patient', 'Partie(s) Amputée(s)', 'Cause', 'Date & Heure']],
-      body: amputeeTableData,
-      theme: 'grid',
-      headStyles: {
-        fillColor: COLOR_PRIMARY,
-        textColor: COLOR_WHITE,
-        fontStyle: 'bold',
-        fontSize: 9,
-      },
-      styles: {
-        textColor: COLOR_DARK_TEXT,
-        fontSize: 8.5,
-        cellPadding: 3.5,
-      },
-      alternateRowStyles: {
-        fillColor: COLOR_ROW_ALT,
-      },
-      margin: { left: 14, right: 14 },
-    });
-  } else {
-    autoTable(doc, {
-      startY: 25,
-      head: [['Information']],
-      body: [["Aucun dossier d'amputation enregistré dans le système."]],
-      theme: 'grid',
-      headStyles: { fillColor: COLOR_PRIMARY, textColor: COLOR_WHITE },
-      styles: { textColor: COLOR_DARK_TEXT, fontSize: 9 },
-      margin: { left: 14, right: 14 },
-    });
-  }
-
-  // ================= 4. TABLE RÉCAPITULATIVE DES DÉCÈS =================
-  doc.addPage();
-  doc.setFontSize(13);
-  doc.setFont('helvetica', 'bold');
-  doc.setTextColor(...COLOR_SECONDARY);
-  doc.text("4. REGISTRE RÉCAPITULATIF DES DÉCÈS", 14, 20);
-
-  const tableData = deceased.map((d: any) => {
-    let priseEnCharge = "—";
-    if (d.status === 'released' || d.isHistorical) {
-      if (d.takingChargeType) {
-        priseEnCharge = d.takingChargeType;
-        if (d.takingChargeType === 'Autre' && d.takingChargeResponsibleName) {
-           priseEnCharge = `Autre (${d.takingChargeResponsibleName})`;
-        }
-      } else if (d.takingChargeResponsibleName) {
-        priseEnCharge = d.takingChargeResponsibleName;
-      }
-    }
-    
-    return [
-      d.refNumber ? `#${d.refNumber}` : 'En attente...',
-      d.cin || '—',
-      d.name || 'Identité Inconnue',
-      d.admissionDate ? format(d.admissionDate.toDate(), 'dd/MM/yyyy') : '—',
-      d.status === 'released' ? 'SORTI' : 'PRÉSENT',
-      d.fridgePosition && d.fridgePosition !== -1 ? `FRIGO-${d.fridgePosition.toString().padStart(2, '0')}` : '—',
-      d.cause || '—',
-      priseEnCharge
-    ];
-  });
-
   autoTable(doc, {
-    startY: 25,
-    head: [['Réf', 'CIN', 'Nom Complet', 'Date Adm.', 'État Actuel', 'Emplacement', 'Cause suspectée', 'Pris en charge']],
-    body: tableData,
+    startY: currentY + 3,
+    head: [['Réf', 'Patient', 'Parties', 'Date']],
+    body: ampRows.length > 0 ? ampRows : [['Aucun enregistrement d\'amputé sur la période.', '', '', '']],
     theme: 'grid',
-    headStyles: {
-      fillColor: COLOR_PRIMARY,
-      textColor: COLOR_WHITE,
-      fontStyle: 'bold',
-      fontSize: 8.5,
-    },
-    styles: {
-      textColor: COLOR_DARK_TEXT,
-      fontSize: 8,
-      cellPadding: 3,
-    },
-    alternateRowStyles: {
-      fillColor: COLOR_ROW_ALT,
-    },
+    headStyles: { fillColor: COLOR_PRIMARY, textColor: COLOR_WHITE, fontSize: 8.5 },
+    styles: { fontSize: 8, cellPadding: 3 },
     margin: { left: 14, right: 14 },
   });
+  currentY = (doc as any).lastAutoTable.finalY + 10;
 
   // Footer on all pages
   const totalPages = doc.getNumberOfPages();
@@ -404,11 +485,12 @@ export const generateDossiersPDF = async (records: DeceasedRecord[], users?: App
 
   const tocData = safeRecords.map((r, idx) => {
     const targetPage = idx + 2;
+    const rDate = safeDate(r.admissionDate);
     return [
       r.refNumber ? `#${r.refNumber}` : 'En attente...',
       r.name || 'Identité Inconnue',
       r.status === 'released' ? 'SORTI / LIBÉRÉ' : 'PRÉSENT',
-      r.admissionDate ? format(r.admissionDate.toDate(), 'dd/MM/yyyy') : '—',
+      rDate ? format(rDate, 'dd/MM/yyyy') : '—',
       r.fridgePosition && r.fridgePosition !== -1 ? `FRIGO-${r.fridgePosition.toString().padStart(2, '0')}` : 'Frigo Inconnu',
       `➔ Ouvrir Fiche (Page ${targetPage})`
     ];
@@ -504,8 +586,9 @@ export const generateDossiersPDF = async (records: DeceasedRecord[], users?: App
       ? `Autre (${record.otherGender})` 
       : (record.gender || 'Non renseigné');
 
-    const dateOfDeathStr = record.dateOfDeath 
-      ? format(record.dateOfDeath.toDate(), 'dd/MM/yyyy', { locale: fr }) 
+    const dDeath = safeDate(record.dateOfDeath);
+    const dateOfDeathStr = dDeath 
+      ? format(dDeath, 'dd/MM/yyyy', { locale: fr }) 
       : 'Non renseignée';
     
     const timeOfDeathStr = record.timeOfDeath || 'Non renseignée';
@@ -529,7 +612,10 @@ export const generateDossiersPDF = async (records: DeceasedRecord[], users?: App
           { content: 'CIN :', styles: { fontStyle: 'bold', textColor: COLOR_DARK_TEXT } },
           { content: record.cin || 'Non renseigné', styles: { textColor: COLOR_DARK_TEXT } },
           { content: 'Date de naissance :', styles: { fontStyle: 'bold', textColor: COLOR_DARK_TEXT } },
-          { content: record.dob ? format(record.dob.toDate(), 'dd/MM/yyyy') : 'Non renseignée', styles: { textColor: COLOR_DARK_TEXT } }
+          { content: (() => {
+            const dob = safeDate(record.dob);
+            return dob ? format(dob, 'dd/MM/yyyy') : 'Non renseignée';
+          })(), styles: { textColor: COLOR_DARK_TEXT } }
         ],
         [
           { content: "Sexe / Genre :", styles: { fontStyle: "bold", textColor: COLOR_DARK_TEXT } },
@@ -575,12 +661,14 @@ export const generateDossiersPDF = async (records: DeceasedRecord[], users?: App
     currentY = (doc as any).lastAutoTable.finalY + 6;
 
     // ================= TABLE 2: LOGISTIQUE MORGUE & PRISE EN CHARGE =================
-    const admissionDateStr = record.admissionDate 
-      ? `${format(record.admissionDate.toDate(), 'dd/MM/yyyy', { locale: fr })} à ${record.admissionTime || '00:00'}`
+    const dAdm = safeDate(record.admissionDate);
+    const admissionDateStr = dAdm 
+      ? `${format(dAdm, 'dd/MM/yyyy', { locale: fr })} à ${record.admissionTime || '00:00'}`
       : 'Non renseignée';
 
-    const exitDateStr = record.status === 'released' && record.exitDate 
-      ? `${format(record.exitDate.toDate(), 'dd/MM/yyyy', { locale: fr })} à ${record.exitTime || '00:00'}`
+    const dExit = safeDate(record.exitDate);
+    const exitDateStr = record.status === 'released' && dExit 
+      ? `${format(dExit, 'dd/MM/yyyy', { locale: fr })} à ${record.exitTime || '00:00'}`
       : (record.status === 'released' ? 'Sorti' : 'Toujours présent en morgue');
 
     autoTable(doc, {
@@ -643,12 +731,15 @@ export const generateDossiersPDF = async (records: DeceasedRecord[], users?: App
 
     // ================= TABLE 3: CHRONOLOGIE DÉTAILLÉE =================
     const timelineRows = (record.timeline && record.timeline.length > 0)
-      ? record.timeline.map(event => [
-          event.timestamp ? format(event.timestamp.toDate(), 'dd/MM/yyyy HH:mm', { locale: fr }) : '—',
-          event.title || 'Événement',
-          event.description || '—',
-          formatOperatorName(event.createdBy, users, 'Opérateur')
-        ])
+      ? record.timeline.map(event => {
+          const eDate = safeDate(event.timestamp);
+          return [
+            eDate ? format(eDate, 'dd/MM/yyyy HH:mm', { locale: fr }) : '—',
+            event.title || 'Événement',
+            event.description || '—',
+            formatOperatorName(event.createdBy, users, 'Opérateur')
+          ];
+        })
       : [['—', 'Admission initiale', 'Dossier créé et enregistré en morgue', formatOperatorName(record.createdBy, users, 'Opérateur')]];
 
     autoTable(doc, {

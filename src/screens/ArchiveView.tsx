@@ -1,3 +1,4 @@
+import { safeDate } from '../lib/utils';
 import { useState } from 'react';
 import { Search, ChevronRight, Download, FileText, ArrowLeft } from 'lucide-react';
 import { AppData, DeceasedRecord } from '../types';
@@ -15,11 +16,11 @@ export function ArchiveView({ data, onNavigate, onSelectDeceased }: ArchiveViewP
   const [isExporting, setIsExporting] = useState(false);
 
   const filteredDeceased = deceased.filter((d: DeceasedRecord) => 
-    d.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
+    (d.name && d.name.toLowerCase().includes(searchTerm.toLowerCase())) || 
     (d.refNumber && d.refNumber.toLowerCase().includes(searchTerm.toLowerCase()))
   ).sort((a: DeceasedRecord, b: DeceasedRecord) => {
-    const timeA = a.admissionDate ? a.admissionDate.toMillis() : 0;
-    const timeB = b.admissionDate ? b.admissionDate.toMillis() : 0;
+    const timeA = safeDate(a.admissionDate)?.getTime() || 0;
+    const timeB = safeDate(b.admissionDate)?.getTime() || 0;
     return timeB - timeA;
   });
 

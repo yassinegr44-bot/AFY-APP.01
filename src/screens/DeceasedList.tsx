@@ -4,7 +4,7 @@ import { motion } from 'motion/react';
 import { formatDate } from '../lib/utils';
 import { DeceasedRecord } from '../types';
 import { differenceInDays, format, differenceInYears } from 'date-fns';
-import { cn } from '../lib/utils';
+import { cn, safeDate } from '../lib/utils';
 
 interface DeceasedListProps {
   data: any;
@@ -28,7 +28,8 @@ export function DeceasedList({ data, onSelectDeceased, onNavigate }: DeceasedLis
     if (filter === 'in_facility') matchesFilter = d.status === 'in_facility';
     if (filter === 'released') matchesFilter = d.status === 'released';
     if (filter === 'urgent') {
-      const diff = d.admissionDate ? differenceInDays(new Date(), d.admissionDate.toDate()) : 0;
+      const dDate = safeDate(d.admissionDate);
+      const diff = dDate ? differenceInDays(new Date(), dDate) : 0;
       matchesFilter = d.status === 'in_facility' && (diff >= settings.alertThresholdDays || d.isUnknown);
     }
     
@@ -108,7 +109,8 @@ export function DeceasedList({ data, onSelectDeceased, onNavigate }: DeceasedLis
               </tr>
             ) : (
               filtered.map((record: DeceasedRecord) => {
-                const diff = record.admissionDate ? differenceInDays(new Date(), record.admissionDate.toDate()) : 0;
+                const dDate = safeDate(record.admissionDate);
+                const diff = dDate ? differenceInDays(new Date(), dDate) : 0;
                 const isUrgent = record.status === 'in_facility' && (diff >= settings.alertThresholdDays || record.isUnknown);
                 const isApproaching = record.status === 'in_facility' && !isUrgent && diff >= settings.alertThresholdDays - 3;
                 const isPending = record.syncStatus === 'pending' || !record.refNumber;
@@ -174,7 +176,10 @@ export function DeceasedList({ data, onSelectDeceased, onNavigate }: DeceasedLis
                     </td>
                     <td className="px-6 py-5">
                       <span className="text-sm font-bold text-slate-700 dark:text-slate-300">
-                        {record.admissionDate ? format(record.admissionDate.toDate(), 'dd/MM/yyyy') : 'Non renseigné'}
+                        {(() => {
+                          const dDate = safeDate(record.admissionDate);
+                          return dDate ? format(dDate, 'dd/MM/yyyy') : 'Non renseigné';
+                        })()}
                       </span>
                     </td>
                     <td className="px-6 py-5">

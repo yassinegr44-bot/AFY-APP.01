@@ -13,9 +13,9 @@ export function AmputeeList({ data, onNavigate, onSelectAmputee }: AmputeeListPr
   const { amputees = [] } = data || {};
 
   const filteredAmputees = amputees.filter(a => 
-    a.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
-    a.firstName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    a.refNumber.toLowerCase().includes(searchTerm.toLowerCase())
+    (a.name && a.name.toLowerCase().includes(searchTerm.toLowerCase())) || 
+    (a.firstName && a.firstName.toLowerCase().includes(searchTerm.toLowerCase())) ||
+    (a.refNumber && a.refNumber.toLowerCase().includes(searchTerm.toLowerCase()))
   );
 
   return (

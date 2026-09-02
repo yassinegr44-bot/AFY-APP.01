@@ -4,6 +4,7 @@ import { ArrowLeft, User, Activity, AlertCircle, Trash2 } from 'lucide-react';
 import { format } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import { formatOperatorName } from '../utils/userUtils';
+import { safeDate } from '../lib/utils';
 interface AmputeeDetailProps {
   record: AmputeeRecord;
   users?: AppUser[];
@@ -61,7 +62,10 @@ export function AmputeeDetail({ record, users, onBack, onDelete }: AmputeeDetail
           <div className="space-y-4">
             <h3 className="font-black text-[#006050] flex items-center gap-2"><Activity size={16} /> Détails de l'amputation</h3>
             <p><strong>Parties corporelles:</strong> {record.bodyParts ? record.bodyParts.join(', ') : 'Non renseigné'}</p>
-            <p><strong>Date & Heure:</strong> {record.amputationDateTime ? format(record.amputationDateTime.toDate(), 'PPP à HH:mm', { locale: fr }) : 'Non renseigné'}</p>
+            <p><strong>Date & Heure:</strong> {(() => {
+              const date = safeDate(record.amputationDateTime);
+              return date ? format(date, 'PPP à HH:mm', { locale: fr }) : 'Non renseigné';
+            })()}</p>
             <p><strong>Dossier créé par:</strong> {formatOperatorName(record.createdBy, users, 'Opérateur')}</p>
           </div>
           <div className="space-y-4">

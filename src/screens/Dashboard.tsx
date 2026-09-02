@@ -5,7 +5,7 @@ import { differenceInDays, formatDistanceToNow } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import { DeceasedRecord } from '../types';
 import { useAuth } from '../context/AuthContext';
-import { cn } from '../lib/utils';
+import { cn, safeDate } from '../lib/utils';
 
 interface DashboardProps {
   data: any;
@@ -34,14 +34,14 @@ export function Dashboard({ data, onNavigate, onSelectDeceased }: DashboardProps
   
   const inFacility = deceased.filter((d: DeceasedRecord) => d.status === 'in_facility');
   const todayAdmissions = deceased.filter((d: DeceasedRecord) => {
-    if (!d.admissionDate) return false;
-    const dDate = d.admissionDate.toDate();
+    const dDate = safeDate(d.admissionDate);
+    if (!dDate) return false;
     const today = new Date();
     return dDate.toDateString() === today.toDateString();
   });
   const todayExits = deceased.filter((d: DeceasedRecord) => {
-    if (!d.exitDate) return false;
-    const eDate = d.exitDate.toDate();
+    const eDate = safeDate(d.exitDate);
+    if (!eDate) return false;
     const today = new Date();
     return eDate.toDateString() === today.toDateString();
   });
@@ -56,12 +56,16 @@ export function Dashboard({ data, onNavigate, onSelectDeceased }: DashboardProps
   const medicoLegalCapacity = 10;
 
   const criticalAlerts = inFacility.filter((d: DeceasedRecord) => {
-    const diff = differenceInDays(new Date(), d.admissionDate.toDate());
+    const dDate = safeDate(d.admissionDate);
+    if (!dDate) return d.isUnknown;
+    const diff = differenceInDays(new Date(), dDate);
     return diff >= settings.alertThresholdDays || d.isUnknown;
   });
 
   const approachingAlerts = inFacility.filter((d: DeceasedRecord) => {
-    const diff = differenceInDays(new Date(), d.admissionDate.toDate());
+    const dDate = safeDate(d.admissionDate);
+    if (!dDate) return false;
+    const diff = differenceInDays(new Date(), dDate);
     return diff >= settings.alertThresholdDays - 3 && diff < settings.alertThresholdDays && !d.isUnknown;
   });
 
@@ -69,7 +73,11 @@ export function Dashboard({ data, onNavigate, onSelectDeceased }: DashboardProps
 
   // Recent activity (dummy sorting for now, ideally by timestamp)
   const recentActivity = [...deceased]
-    .sort((a, b) => b.admissionDate.seconds - a.admissionDate.seconds)
+    .sort((a, b) => {
+      const aTime = safeDate(a.admissionDate)?.getTime() || 0;
+      const bTime = safeDate(b.admissionDate)?.getTime() || 0;
+      return bTime - aTime;
+    })
     .slice(0, 3);
 
   return (
@@ -254,7 +262,8 @@ export function Dashboard({ data, onNavigate, onSelectDeceased }: DashboardProps
         ) : (
           <div className="space-y-3">
             {[...criticalAlerts, ...approachingAlerts].slice(0, 5).map((record) => {
-              const diff = differenceInDays(new Date(), record.admissionDate.toDate());
+              const dDate = safeDate(record.admissionDate);
+              const diff = dDate ? differenceInDays(new Date(), dDate) : 0;
               const isCritical = diff >= settings.alertThresholdDays || record.isUnknown;
               
               return (
@@ -427,7 +436,10 @@ export function Dashboard({ data, onNavigate, onSelectDeceased }: DashboardProps
                           {isPending ? 'Admission en attente de synchro' : `Admission : Dossier #${record.refNumber}`}
                         </p>
                         <span className="text-[10px] text-slate-400 font-medium">
-                          {formatDistanceToNow(record.admissionDate.toDate(), { addSuffix: true, locale: fr })}
+                          {(() => {
+                            const dDate = safeDate(record.admissionDate);
+                            return dDate ? formatDistanceToNow(dDate, { addSuffix: true, locale: fr }) : 'Non renseigné';
+                          })()}
                         </span>
                       </div>
                       <p className="text-xs text-slate-500 dark:text-slate-400 font-medium">

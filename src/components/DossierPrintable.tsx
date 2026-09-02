@@ -1,3 +1,4 @@
+import { safeDate } from '../lib/utils';
 import { format } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import { DeceasedRecord, AppUser } from '../types';
@@ -101,7 +102,12 @@ export function DossierPrintable({ record, users }: DossierPrintableProps) {
           <h2 className="text-xs font-black text-slate-700 dark:text-slate-300 uppercase tracking-wider mb-3">2. Circonstances du Décès</h2>
           <div className="space-y-1.5 text-sm">
             <p><strong className="text-slate-900 dark:text-white">Cause suspectée :</strong> <span className="text-slate-800 dark:text-slate-200">{record.cause || 'Non spécifiée'}</span></p>
-            <p><strong className="text-slate-900 dark:text-white">Date de décès :</strong> <span className="text-slate-800 dark:text-slate-200">{record.dateOfDeath ? format(record.dateOfDeath.toDate(), 'dd/MM/yyyy', { locale: fr }) : 'Non renseignée'}</span></p>
+            <p><strong className="text-slate-900 dark:text-white">Date de décès :</strong> <span className="text-slate-800 dark:text-slate-200">
+              {(() => {
+                const d = safeDate(record.dateOfDeath);
+                return d ? format(d, 'dd/MM/yyyy', { locale: fr }) : 'Non renseignée';
+              })()}
+            </span></p>
             <p><strong className="text-slate-900 dark:text-white">Heure de décès :</strong> <span className="text-slate-800 dark:text-slate-200">{record.timeOfDeath || 'Non renseignée'}</span></p>
             <p><strong className="text-slate-900 dark:text-white">Détail origine :</strong> <span className="text-slate-800 dark:text-slate-200">{record.originDetail || 'Aucun'}</span></p>
           </div>
@@ -120,9 +126,19 @@ export function DossierPrintable({ record, users }: DossierPrintableProps) {
                   ? 'Frigo 11 (Médico-Légal)'
                   : `Frigo ${(record.fridgeNumber || record.fridgePosition).toString().padStart(2, '0')}`}
             </span></p>
-            <p><strong className="text-slate-900 dark:text-white">Date Admission :</strong> <span className="text-slate-800 dark:text-slate-200">{record.admissionDate ? format(record.admissionDate.toDate(), 'dd/MM/yyyy', { locale: fr }) : '—'} {record.admissionTime}</span></p>
+            <p><strong className="text-slate-900 dark:text-white">Date Admission :</strong> <span className="text-slate-800 dark:text-slate-200">
+              {(() => {
+                const d = safeDate(record.admissionDate);
+                return d ? format(d, 'dd/MM/yyyy', { locale: fr }) : '—';
+              })()} {record.admissionTime}
+            </span></p>
             {isReleased && record.exitDate && (
-              <p><strong className="text-slate-900 dark:text-white">Date de Sortie :</strong> <span className="text-slate-800 dark:text-slate-200">{format(record.exitDate.toDate(), 'dd/MM/yyyy', { locale: fr })} {record.exitTime}</span></p>
+              <p><strong className="text-slate-900 dark:text-white">Date de Sortie :</strong> <span className="text-slate-800 dark:text-slate-200">
+                {(() => {
+                  const d = safeDate(record.exitDate);
+                  return d ? format(d, 'dd/MM/yyyy', { locale: fr }) : 'Non renseignée';
+                })()} {record.exitTime}
+              </span></p>
             )}
             <p><strong className="text-slate-900 dark:text-white">Statut Actuel :</strong> <span className="text-slate-800 dark:text-slate-200">{isReleased ? 'Libéré' : 'En établissement'}</span></p>
             {isReleased && (
@@ -149,7 +165,10 @@ export function DossierPrintable({ record, users }: DossierPrintableProps) {
             record.timeline.map((event) => (
               <div key={event.id} className="flex items-start gap-2 border-b border-slate-200/60 dark:border-slate-700/60 pb-1.5 last:border-0 last:pb-0">
                 <span className="text-xs font-bold text-slate-600 dark:text-slate-400 min-w-[130px]">
-                  {event.timestamp ? format(event.timestamp.toDate(), 'dd/MM/yyyy HH:mm', { locale: fr }) : '—'}
+                  {(() => {
+                    const d = safeDate(event.timestamp);
+                    return d ? format(d, 'dd/MM/yyyy HH:mm', { locale: fr }) : '—';
+                  })()}
                 </span>
                 <span className="font-bold text-slate-900 dark:text-white">{event.title}</span>
                 {event.description && <span className="text-slate-700 dark:text-slate-300">— {event.description}</span>}

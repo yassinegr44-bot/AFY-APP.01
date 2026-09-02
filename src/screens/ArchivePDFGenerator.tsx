@@ -1,3 +1,4 @@
+import { safeDate } from '../lib/utils';
 import { useState } from 'react';
 import { DossierPrintable } from '../components/DossierPrintable';
 import { AppData, DeceasedRecord } from '../types';
@@ -18,8 +19,8 @@ export function ArchivePDFGenerator({ data, onNavigate }: ArchivePDFGeneratorPro
 
   const filteredRecords = deceased.filter((d: DeceasedRecord) => {
     const matchesSearch = 
-      d.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      d.refNumber.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      (d.name && d.name.toLowerCase().includes(searchQuery.toLowerCase())) ||
+      (d.refNumber && d.refNumber.toLowerCase().includes(searchQuery.toLowerCase())) ||
       (d.cause && d.cause.toLowerCase().includes(searchQuery.toLowerCase())) ||
       (d.fridgePosition && `frigo-${d.fridgePosition}`.toLowerCase().includes(searchQuery.toLowerCase())) ||
       (d.takingChargeResponsibleName && d.takingChargeResponsibleName.toLowerCase().includes(searchQuery.toLowerCase()));
@@ -27,7 +28,11 @@ export function ArchivePDFGenerator({ data, onNavigate }: ArchivePDFGeneratorPro
     const matchesStatus = statusFilter === 'all' || d.status === statusFilter;
 
     return matchesSearch && matchesStatus;
-  }).sort((a: DeceasedRecord, b: DeceasedRecord) => b.admissionDate.toMillis() - a.admissionDate.toMillis());
+  }).sort((a: DeceasedRecord, b: DeceasedRecord) => {
+    const timeA = safeDate(a.admissionDate)?.getTime() || 0;
+    const timeB = safeDate(b.admissionDate)?.getTime() || 0;
+    return timeB - timeA;
+  });
 
   const handleGeneratePDF = async (recordsToExport: DeceasedRecord[]) => {
     try {

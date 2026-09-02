@@ -18,8 +18,8 @@ export function QuickSearch({ records, onSelect }: QuickSearchProps) {
   useEffect(() => {
     if (query.length > 1) {
       const filtered = records.filter(r => 
-        r.name.toLowerCase().includes(query.toLowerCase()) || 
-        r.refNumber.toLowerCase().includes(query.toLowerCase())
+        (r.name && r.name.toLowerCase().includes(query.toLowerCase())) || 
+        (r.refNumber && r.refNumber.toLowerCase().includes(query.toLowerCase()))
       ).slice(0, 5);
       setResults(filtered);
     } else {
